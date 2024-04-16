@@ -1,0 +1,920 @@
+Disk Management
+-----------------------------------------------------
+
+
+platter, head, cylinder, sector  --> Mechanical disk
+
+SSD[solid state drive ] --> no electronic circuit
+
+IAD ,EDA, IDE ,SATA, , NVME [ M2 version High Performance ] disk ---> Storage controller
+
+
+
+Hard disk, Memory Card,LUN[ coming from network/ coming from another server] --> Storage Disk -->BLock device ---> lsblk [list blocks]
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk      
+sr0            11:0    1  6.6G  0 rom  /run/media/student/RHEL-8-0-0-BaseOS-x86_64
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+
+
+----------------------
+sda --->satadisk/scsi
+sr0 ---> CD/DVD of ISO
+nvme ---> disk
+------------------------
+
+Naming Conventions/Type of controller/Disk
+
+IDE      ---> h--
+scsi/sata --> s--
+NvME      --> nvme-- [fast performance]
+
+a - 1st disk
+b - 2nd disk
+c - 3rd disk
+------------
+
+
+fdisk -l or fdisk -l [diskpath]  ---> storage device information
+
+root@localhost ~]# fdisk -l
+Disk /dev/nvme0n1: 30 GiB, 32212254720 bytes, 62914560 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xfd07755c
+
+Device         Boot   Start      End  Sectors Size Id Type
+/dev/nvme0n1p1 *       2048  2099199  2097152   1G 83 Linux
+/dev/nvme0n1p2      2099200 62914559 60815360  29G 8e Linux LVM
+
+
+Disk /dev/mapper/rhel-root: 26 GiB, 27913093120 bytes, 54517760 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/mapper/rhel-swap: 3 GiB, 3221225472 bytes, 6291456 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# 
+
+------------------------------------------------------
+
+with fdisk  we can't more than 4 partitions --> fdisk used for Manging MBR disk
+GUID partition like gparted 
+--------------------------------------------
+
+dmesg ---> kernel ring buffer --> best for disk logs information like issues
+
+dmesg | grep [disk_name]
+
+root@localhost ~]# dmesg | grep sda
+[ 3866.964264] sd 2:0:0:0: [sda] 41943040 512-byte logical blocks: (21.5 GB/20.0 GiB)
+[ 3866.964271] sd 2:0:0:0: [sda] Write Protect is off
+[ 3866.964272] sd 2:0:0:0: [sda] Mode Sense: 00 3a 00 00
+[ 3866.964278] sd 2:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[ 3866.974885] sd 2:0:0:0: [sda] Attached SCSI disk
+[root@localhost ~]#
+
+[root@localhost ~]# dmesg | grep nvme
+[    4.247609] nvme nvme0: pci function 0000:0b:00.0
+[    4.268701] nvme nvme0: 15/0/0 default/read/poll queues
+[    4.359515]  nvme0n1: p1 p2
+[    8.909958] XFS (nvme0n1p1): Mounting V5 Filesystem
+[    9.298208] XFS (nvme0n1p1): Starting recovery (logdev: internal)
+[    9.304218] XFS (nvme0n1p1): Ending recovery (logdev: internal)
+[root@localhost ~]# 
+-------------------------------------------------------------------------------
+
+lshw ---> list hardware + disk related info
+
+[root@localhost ~]# lshw
+localhost.localdomain       
+    description: Computer
+    product: VMware Virtual Platform
+    vendor: VMware, Inc.
+    version: None
+    serial: VMware-56 4d b2 bd f7 3b 27 f9-ed 9a 68 fa 3e 33 c6 2c
+    width: 64 bits
+    capabilities: smbios-2.7 dmi-2.7 smp vsyscall32
+    configuration: administrator_password=enabled boot=normal frontpanel_password=unknown keyboard_password=unknown power-on_password=disabled uuid=564DB2BD-F73B-27F9-ED9A-68FA3E33C62C
+  *-core
+       description: Motherboard
+       product: 440BX Desktop Reference Platform
+       vendor: Intel Corporation
+       physical id: 0
+       version: None
+       serial: None
+     *-firmware
+          description: BIOS
+          vendor: Phoenix Technologies LTD
+          physical id: 0
+          version: 6.00
+          date: 11/12/2020
+          size: 86KiB
+          capabilities: isa pci pcmcia pnp apm upgrade shadowing escd cdboot bootselect edd int5printscreen int9keyboard int14serial int17printer int10video acpi smartbattery biosbootspecification netboot
+
+----------------------------------------------------------------------------------
+
+lsscsi ---> list the attached scsi disk
+
+
+[root@localhost ~]# lsscsi
+[2:0:0:0]    disk    ATA      VMware Virtual S 0001  /dev/sda 
+[3:0:0:0]    cd/dvd  NECVMWar VMware SATA CD01 1.00  /dev/sr0 
+[N:0:0:1]    disk    VMware Virtual NVMe Disk__1                /dev/nvme0n1
+[root@localhost ~]# 
+
+--or---
+
+cat /proc/scsi/scsi
+
+[root@localhost ~]# cat /proc/scsi/scsi 
+Attached devices:
+Host: scsi3 Channel: 00 Id: 00 Lun: 00
+  Vendor: NECVMWar Model: VMware SATA CD01 Rev: 1.00
+  Type:   CD-ROM                           ANSI  SCSI revision: 05
+Host: scsi2 Channel: 00 Id: 00 Lun: 00
+  Vendor: ATA      Model: VMware Virtual S Rev: 0001
+  Type:   Direct-Access                    ANSI  SCSI revision: 05
+[root@localhost ~]# 
+
+[ if we created lun in iscsi server and shared the information also  displayed]
+
+--------------------------------------------------------------------------------
+
+Disk Erase --> if we format / delete data --> still it can be  recovered by tools
+
+Solution:-
+
+Method:-1  badblocks
+with below method block sectors random data override so it will be impossible to recover data
+
+
+step:-1 choose disk
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+
+step:-2 badblocks
+
+badblocks -ws [disk]
+
+[root@localhost ~]# badblocks -ws /dev/sda 
+Testing with pattern 0xaa: done                                                 
+Reading and comparing: done                                                 
+Testing with pattern 0x55: done                                                 
+Reading and comparing: done                                                 
+Testing with pattern 0xff: done                                                 
+Reading and comparing: done                                                 
+Testing with pattern 0x00: done                                                 
+Reading and comparing: done                                                 
+[root@localhost ~]# 
+
+
+---------or--------
+
+dd commmand ---> disk destroyer [Uses:- specific size of file can be created, we can create swap file with dd ]
+
+step :-1 Below command will replace every sector and block with zero . so data can't be retreived
+
+dd if=/dev/zero of=[disk] -->
+
+[root@localhost ~]# dd if=/dev/zero of=/dev/sda
+dd: writing to '/dev/sda': No space left on device
+41943041+0 records in
+41943040+0 records out
+21474836480 bytes (21 GB, 20 GiB) copied, 1571.18 s, 13.7 MB/s
+[root@localhost ~]# 
+
+
+----------------------------------------------
+
+system --> every disk/h/w info stored as file
+
+b --> block  ---> if we delete below file our data will be corrupted.
+
+[root@localhost ~]# ls -l /dev/sda
+brw-rw----. 1 root disk 8, 0 Apr 12 16:16 /dev/sda
+[root@localhost ~]# 
+
+===============================================================================================
+
+Downtime ---> we can add all the disk without reboot [ on the go ] --> except nvme disk which requires downtime
+
+
+scan scsi disks
+
+
+Method :-1 Loop scan 
+
+[root@localhost ~]# ls /sys/class/scsi_host/ | while read host ; do echo "- - -" > /sys/class/scsi_host/$host/scan ; done
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+
+Method :-2 scsi-rescan -a
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# scsi-rescan -a
+Scanning SCSI subsystem for new devices
+Scanning host 0 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 1 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 2 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+ Scanning for device 2 0 0 0 ... 
+OLD: Host: scsi2 Channel: 00 Id: 00 Lun: 00
+      Vendor: ATA      Model: VMware Virtual S Rev: 0001
+      Type:   Direct-Access                    ANSI SCSI revision: 05
+Scanning host 3 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+ Scanning for device 3 0 0 0 ...           
+OLD: Host: scsi3 Channel: 00 Id: 00 Lun: 00
+      Vendor: NECVMWar Model: VMware SATA CD01 Rev: 1.00
+      Type:   CD-ROM                           ANSI SCSI revision: 05
+Scanning host 4 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 5 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 6 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 7 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 8 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 9 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 10 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 11 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 12 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 13 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 14 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 15 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 16 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 17 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 18 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 19 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 20 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 21 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 22 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 23 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 24 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 25 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 26 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 27 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 28 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 29 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 30 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 31 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 32 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+ Scanning for device 32 0 0 0 ...          
+NEW: Host: scsi32 Channel: 00 Id: 00 Lun: 00
+      Vendor: VMware,  Model: VMware Virtual S Rev: 1.0 
+      Type:   Direct-Access                    ANSI SCSI revision: 02
+1 new or changed device(s) found.          
+	[32:0:0:0]
+0 remapped or resized device(s) found.
+0 device(s) removed.                 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+
+Method :- 3 
+
+ot@localhost ~]# rescan-scsi-bus.sh -a
+Scanning SCSI subsystem for new devices
+Scanning host 0 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 1 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+Scanning host 2 for  SCSI target IDs  0 1 2 3 4 5 6 7, all LUNs
+
+
+
+https://access.redhat.com/solutions/1314183
+
+=============================================================
+
+
+Fdisk ---> MBR ----> 4 primary Partitions  
+           MBR ----> 3 Primary + 1 extended Partitions
+           MBR ----> further logical
+
+
+Gdisk ---> GPT [GUid partition table ] --->UEFI [ not support for BIOS ] ---> 128 primary paritions 
+                              
+
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# gdisk -l
+GPT fdisk (gdisk) version 1.0.3
+
+Problem opening -l for reading! Error is 2.
+The specified file does not exist!
+[root@localhost ~]# gdisk -l /dev/sda 
+GPT fdisk (gdisk) version 1.0.3
+
+Partition table scan:
+  MBR: not present
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+Creating new GPT entries.
+Disk /dev/sda: 41943040 sectors, 20.0 GiB
+Model: VMware Virtual S
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 1D9C6F48-0BD9-43AF-90B9-22B81235C7DA
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 41943006
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 41942973 sectors (20.0 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+[root@localhost ~]#
+-----------------------------------------------------------------------
+
+Partprobe ---> kernel read info changes of both MBR /GPT disk 
+
+===============================================
+
+
+[root@localhost ~]# cat /proc/partitions 
+major minor  #blocks  name
+
+ 259        0   31457280 nvme0n1
+ 259        1    1048576 nvme0n1p1
+ 259        2   30407680 nvme0n1p2
+   8        0   20971520 sda
+  11        0    1048575 sr0
+ 253        0   27258880 dm-0
+ 253        1    3145728 dm-1
+   8       16    5242880 sdb
+[root@localhost ~]# 
+
+
+==========================================================================
+Create partitions
+
+
+Step:-1 
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# gdisk -l
+GPT fdisk (gdisk) version 1.0.3
+
+Problem opening -l for reading! Error is 2.
+The specified file does not exist!
+[root@localhost ~]# gdisk -l /dev/sda 
+GPT fdisk (gdisk) version 1.0.3
+
+Partition table scan:
+  MBR: not present
+  BSD: not present
+  APM: not present
+  GPT: not present
+
+Creating new GPT entries.
+Disk /dev/sda: 41943040 sectors, 20.0 GiB
+Model: VMware Virtual S
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 1D9C6F48-0BD9-43AF-90B9-22B81235C7DA
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 41943006
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 41942973 sectors (20.0 GiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+[root@localhost ~]# cat /proc/partitions 
+major minor  #blocks  name
+
+ 259        0   31457280 nvme0n1
+ 259        1    1048576 nvme0n1p1
+ 259        2   30407680 nvme0n1p2
+   8        0   20971520 sda
+  11        0    1048575 sr0
+ 253        0   27258880 dm-0
+ 253        1    3145728 dm-1
+   8       16    5242880 sdb
+[root@localhost ~]# ls -l /dev/sda 
+brw-rw----. 1 root disk 8, 0 Apr 12 22:51 /dev/sda
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x90d97347.
+
+Command (m for help): m
+
+Help:
+
+  DOS (MBR)
+   a   toggle a bootable flag
+   b   edit nested BSD disklabel
+   c   toggle the dos compatibility flag
+
+  Generic
+   d   delete a partition
+   F   list free unpartitioned space
+   l   list known partition types
+   n   add a new partition
+   p   print the partition table
+   t   change a partition type
+   v   verify the partition table
+   i   print information about a partition
+
+  Misc
+   m   print this menu
+   u   change display/entry units
+   x   extra functionality (experts only)
+
+  Script
+   I   load disk layout from sfdisk script file
+   O   dump disk layout to sfdisk script file
+
+  Save & Exit
+   w   write table to disk and exit
+   q   quit without saving changes
+
+  Create a new label
+   g   create a new empty GPT partition table
+   G   create a new empty SGI (IRIX) partition table
+   o   create a new empty DOS partition table
+   s   create a new empty Sun partition table
+
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 
+First sector (2048-41943039, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-41943039, default 41943039): +2G
+
+Created a new partition 1 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): L
+
+ 0  Empty           24  NEC DOS         81  Minix / old Lin bf  Solaris        
+ 1  FAT12           27  Hidden NTFS Win 82  Linux swap / So c1  DRDOS/sec (FAT-
+ 2  XENIX root      39  Plan 9          83  Linux           c4  DRDOS/sec (FAT-
+ 3  XENIX usr       3c  PartitionMagic  84  OS/2 hidden or  c6  DRDOS/sec (FAT-
+ 4  FAT16 <32M      40  Venix 80286     85  Linux extended  c7  Syrinx         
+ 5  Extended        41  PPC PReP Boot   86  NTFS volume set da  Non-FS data    
+ 6  FAT16           42  SFS             87  NTFS volume set db  CP/M / CTOS / .
+ 7  HPFS/NTFS/exFAT 4d  QNX4.x          88  Linux plaintext de  Dell Utility   
+ 8  AIX             4e  QNX4.x 2nd part 8e  Linux LVM       df  BootIt         
+ 9  AIX bootable    4f  QNX4.x 3rd part 93  Amoeba          e1  DOS access     
+ a  OS/2 Boot Manag 50  OnTrack DM      94  Amoeba BBT      e3  DOS R/O        
+ b  W95 FAT32       51  OnTrack DM6 Aux 9f  BSD/OS          e4  SpeedStor      
+ c  W95 FAT32 (LBA) 52  CP/M            a0  IBM Thinkpad hi ea  Rufus alignment
+ e  W95 FAT16 (LBA) 53  OnTrack DM6 Aux a5  FreeBSD         eb  BeOS fs        
+ f  W95 Ext'd (LBA) 54  OnTrackDM6      a6  OpenBSD         ee  GPT            
+10  OPUS            55  EZ-Drive        a7  NeXTSTEP        ef  EFI (FAT-12/16/
+11  Hidden FAT12    56  Golden Bow      a8  Darwin UFS      f0  Linux/PA-RISC b
+12  Compaq diagnost 5c  Priam Edisk     a9  NetBSD          f1  SpeedStor      
+14  Hidden FAT16 <3 61  SpeedStor       ab  Darwin boot     f4  SpeedStor      
+16  Hidden FAT16    63  GNU HURD or Sys af  HFS / HFS+      f2  DOS secondary  
+17  Hidden HPFS/NTF 64  Novell Netware  b7  BSDI fs         fb  VMware VMFS    
+18  AST SmartSleep  65  Novell Netware  b8  BSDI swap       fc  VMware VMKCORE 
+1b  Hidden W95 FAT3 70  DiskSecure Mult bb  Boot Wizard hid fd  Linux raid auto
+1c  Hidden W95 FAT3 75  PC/IX           bc  Acronis FAT32 L fe  LANstep        
+1e  Hidden W95 FAT1 80  Old Minix       be  Solaris boot    ff  BBT            
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+└─sda1          8:1    0    2G  0 part 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 
+First sector (4196352-41943039, default 4196352): 
+Last sector, +sectors or +size{K,M,G,T,P} (4196352-41943039, default 41943039): +3G
+
+Created a new partition 2 of type 'Linux' and of size 3 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+\[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+├─sda1          8:1    0    2G  0 part 
+└─sda2          8:2    0    3G  0 part 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x90d97347
+
+Device     Boot   Start      End Sectors Size Id Type
+/dev/sda1          2048  4196351 4194304   2G 8e Linux LVM
+/dev/sda2       4196352 10487807 6291456   3G 83 Linux
+[root@localhost ~]# cat /proc/partitions 
+major minor  #blocks  name
+
+ 259        0   31457280 nvme0n1
+ 259        1    1048576 nvme0n1p1
+ 259        2   30407680 nvme0n1p2
+   8        0   20971520 sda
+   8        1    2097152 sda1
+   8        2    3145728 sda2
+  11        0    1048575 sr0
+ 253        0   27258880 dm-0
+ 253        1    3145728 dm-1
+   8       16    5242880 sdb
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (3,4, default 3): 
+First sector (10487808-41943039, default 10487808): 
+Last sector, +sectors or +size{K,M,G,T,P} (10487808-41943039, default 41943039): +1G
+
+Created a new partition 3 of type 'Linux' and of size 1 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (3 primary, 0 extended, 1 free)
+   e   extended (container for logical partitions)
+Select (default e): p
+
+Selected partition 4
+First sector (12584960-41943039, default 12584960): 
+Last sector, +sectors or +size{K,M,G,T,P} (12584960-41943039, default 41943039): +4G
+
+Created a new partition 4 of type 'Linux' and of size 4 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x90d97347
+
+Device     Boot    Start      End Sectors Size Id Type
+/dev/sda1           2048  4196351 4194304   2G 8e Linux LVM
+/dev/sda2        4196352 10487807 6291456   3G 83 Linux
+/dev/sda3       10487808 12584959 2097152   1G 83 Linux
+/dev/sda4       12584960 20973567 8388608   4G 83 Linux
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+To create more partitions, first replace a primary with an extended partition.
+
+Command (m for help): d
+Partition number (1-4, default 4): 4
+
+Partition 4 has been deleted.
+
+Command (m for help): n
+Partition type
+   p   primary (3 primary, 0 extended, 1 free)
+   e   extended (container for logical partitions)
+Select (default e): e
+
+Selected partition 4
+First sector (12584960-41943039, default 12584960):  
+Last sector, +sectors or +size{K,M,G,T,P} (12584960-41943039, default 41943039): 
+
+Created a new partition 4 of type 'Extended' and of size 14 GiB.
+
+Command (m for help): n
+All primary partitions are in use.
+Adding logical partition 5
+First sector (12587008-41943039, default 12587008): 
+Last sector, +sectors or +size{K,M,G,T,P} (12587008-41943039, default 41943039): +2G
+
+Created a new partition 5 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   20G  0 disk 
+├─sda1          8:1    0    2G  0 part 
+├─sda2          8:2    0    3G  0 part 
+├─sda3          8:3    0    1G  0 part 
+├─sda4          8:4    0  512B  0 part 
+└─sda5          8:5    0    2G  0 part 
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda
+/dev/sda   /dev/sda1  /dev/sda2  /dev/sda3  /dev/sda4  /dev/sda5  
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x90d97347
+
+Device     Boot    Start      End  Sectors Size Id Type
+/dev/sda1           2048  4196351  4194304   2G 8e Linux LVM
+/dev/sda2        4196352 10487807  6291456   3G 83 Linux
+/dev/sda3       10487808 12584959  2097152   1G 83 Linux
+/dev/sda4       12584960 41943039 29358080  14G  5 Extended
+/dev/sda5       12587008 16781311  4194304   2G 83 Linux
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+step:-2 we can't go inside the partition and also we can't mount directly partition as we need to define fs type
+
+[root@localhost ~]# cd /dev/sda1
+-bash: cd: /dev/sda1: Not a directory
+[root@localhost ~]# mkdir /data
+[root@localhost ~]# mount /dev/sda1 /data/
+mount: /data: wrong fs type, bad option, bad superblock on /dev/sda1, missing codepage or helper program, or other error.
+[root@localhost ~]#
+
+
+step:-3 Format the FS 
+
+Format ---> not only data erase --->way to data oraganize --> define capacity of file/data we can store, support  space, filename character length other..
+
+After formating disk system will generate and provide UUID to the disk
+
+[root@localhost ~]# mkfs.xfs /dev/sda1 
+meta-data=/dev/sda1              isize=512    agcount=4, agsize=131072 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=524288, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+
+Step:4 to check fs type and partion details
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+├─sda1        xfs               b16e41e3-7f51-4aa4-a859-c68e99f9ab77   
+├─sda2                                                                 
+├─sda3                                                                 
+├─sda4                                                                 
+└─sda5                                                                 
+sdb                                                                    
+sr0                                                                    
+nvme0n1                                                                
+├─nvme0n1p1   xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2   LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]#
+
+------or -------
+
+[root@localhost ~]# blkid
+/dev/mapper/rhel-root: UUID="f05892e1-5861-43e0-9673-7a6919be6874" TYPE="xfs"
+/dev/nvme0n1p2: UUID="dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB" TYPE="LVM2_member" PARTUUID="fd07755c-02"
+/dev/nvme0n1: PTUUID="fd07755c" PTTYPE="dos"
+/dev/nvme0n1p1: UUID="56cad9d4-5f7a-485e-82d8-167c69e5df2d" TYPE="xfs" PARTUUID="fd07755c-01"
+/dev/sda1: UUID="b16e41e3-7f51-4aa4-a859-c68e99f9ab77" TYPE="xfs" PARTUUID="90d97347-01"
+/dev/sda2: PARTUUID="90d97347-02"
+/dev/sda3: PARTUUID="90d97347-03"
+/dev/sda5: PARTUUID="90d97347-05"
+/dev/mapper/rhel-swap: UUID="3633ed8b-1180-47d3-bf9b-b584302c8202" TYPE="swap"
+[root@localhost ~]#
+
+
+
+step:-5 we are mounting the /dev/sda1 partition
+
+[root@localhost ~]# mount /dev/sda1 /data/
+[root@localhost ~]# df -hTP /data/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sda1      xfs   2.0G   47M  2.0G   3% /data
+
+
+
+Extra:- 
+
+if we mount in /data and kept some file and umount  and mount in /test then files are be visible in /test as data kept under /dev/sda1 partition rather than directory & timestamp remain same
+
+[root@localhost ~]# df -hTP /data/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sda1      xfs   2.0G   47M  2.0G   3% /data
+[root@localhost ~]# cd /data/
+[root@localhost data]# touch test{1..100}
+[root@localhost data]# ls
+test1    test14  test2   test25  test30  test36  test41  test47  test52  test58  test63  test69  test74  test8   test85  test90  test96
+test10   test15  test20  test26  test31  test37  test42  test48  test53  test59  test64  test7   test75  test80  test86  test91  test97
+test100  test16  test21  test27  test32  test38  test43  test49  test54  test6   test65  test70  test76  test81  test87  test92  test98
+test11   test17  test22  test28  test33  test39  test44  test5   test55  test60  test66  test71  test77  test82  test88  test93  test99
+test12   test18  test23  test29  test34  test4   test45  test50  test56  test61  test67  test72  test78  test83  test89  test94
+test13   test19  test24  test3   test35  test40  test46  test51  test57  test62  test68  test73  test79  test84  test9   test95
+[root@localhost data]# cal >cal
+[root@localhost data]# cat cal 
+     April 2024     
+Su Mo Tu We Th Fr Sa
+    1  2  3  4  5  6
+ 7  8  9 10 11 12 13
+14 15 16 17 18 19 20
+21 22 23 24 25 26 27
+28 29 30            
+                    
+[root@localhost data]# cd ..
+[root@localhost /]# umount /data 
+[root@localhost /]# mkdir /test
+[root@localhost /]# mount /dev/sda1 /test/
+[root@localhost /]# cd /test/
+[root@localhost test]# ls
+cal      test13  test19  test24  test3   test35  test40  test46  test51  test57  test62  test68  test73  test79  test84  test9   test95
+test1    test14  test2   test25  test30  test36  test41  test47  test52  test58  test63  test69  test74  test8   test85  test90  test96
+test10   test15  test20  test26  test31  test37  test42  test48  test53  test59  test64  test7   test75  test80  test86  test91  test97
+test100  test16  test21  test27  test32  test38  test43  test49  test54  test6   test65  test70  test76  test81  test87  test92  test98
+test11   test17  test22  test28  test33  test39  test44  test5   test55  test60  test66  test71  test77  test82  test88  test93  test99
+test12   test18  test23  test29  test34  test4   test45  test50  test56  test61  test67  test72  test78  test83  test89  test94
+[root@localhost test]# 
+
+
+-----------------------------------------------------------------------------------------------------------
+
+
+
+Drawbacks--> LVM 
+
+1. sda1 full we can't extend directly --> need to take backup of partition and delete the partion and need make large disk and need to make again parition restore the files
+
+
+Solution:-
+
+LVM concept we can increase  the space on the go [without downtime]
+
+if disk is full we can add another disk and extend the volume group extend the FS
+
+===========================================================================================================================
+
+
+Comments:-
+
+1. External storage device then scan it will show same
+
+ide ---> hda,hdb
+scsi,sata -->sda,sdb
+
+2. RPM  ---> revoultion per miniute  harddisk
+
+3. list os is physical or virtual --- dmidecode -t1
+
+Manufacturer:- Vmware; Dell; HPE 
+
+4. Need to use USB on both Windows and Linux ---> NTFS format is better
+
+5. diff yum and dnf ---> Package Management
+  yum ---> supports rhel 7
+ dnf  ---> from rhel8
+
+
+6  Extended Partitions uses
+
+if our primary partition is not sufficient then we will use extended partition with logical
+
+7. Boot partition size ---> 1GB [1024 MB] sufficient
+
+
+
+
+
+

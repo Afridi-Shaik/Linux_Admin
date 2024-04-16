@@ -1,0 +1,518 @@
+File system ---> way of oragnizing storage 
+------------------------------------------------------------------------------------------------------------
+man fs
+
+FILESYSTEMS(5)                                          Linux Programmer's Manual                                         FILESYSTEMS(5)
+
+NAME
+       filesystems  -  Linux filesystem types: ext, ext2, ext3, ext4, hpfs, iso9660, JFS, minix, msdos, ncpfs nfs, ntfs, proc, Reiserfs,
+       smb, sysv, umsdos, vfat, XFS, xiafs,
+========================================================================================================
+Below command show availble fs
+
+
+[root@localhost test]# cat /proc/filesystems | grep -v nodev
+	xfs
+	fuseblk
+	ext3
+	ext2
+	ext4
+	iso9660
+	vfat
+[root@localhost test]# 
+=========================================================================================
+
+mount -t---> type is not required as system autodetct the type from /etc/filesystem
+
+[root@localhost test]# cat /etc/filesystems 
+ext4
+ext3
+ext2
+nodev proc
+nodev devpts
+iso9660
+vfat
+hfs
+hfsplus
+*
+
+man mount ---> to get help of mount command
+=======================================================================
+
+MOUNT(8)                                                  System Administration                                                 MOUNT(8)
+
+NAME
+       mount - mount a filesystem
+
+=============================================================
+
+
+
+Commonly used file system types are  ---> ext2, ext3, ext4,xfs
+
+
+ext2 ---> 2nd extended fs ---> cons:- it will take long time for filesystem check [fsck]  ---> no journaling
+
+ext3 -->  3rd extended fs --> same ext2 + journaling enabled 
+
+journaling = [ writing changes on fs --> Not required fs check {power failure, unclean shutdown}]
+
+
+
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  EXT2[mke2fs [disk] ] @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+[root@localhost test]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0   10G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost test]# fdisk /dev/sdc 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x0ca8a32d.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 
+First sector (2048-20971519, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-20971519, default 20971519): +1G
+
+Created a new partition 1 of type 'Linux' and of size 1 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost test]# partprobe
+[root@localhost test]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0   10G  0 disk 
+└─sdc1          8:33   0    1G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost test]# mke2fs /dev/sdc1 
+mke2fs 1.44.3 (10-July-2018)
+Creating filesystem with 262144 4k blocks and 65536 inodes
+Filesystem UUID: e3af9176-12be-49b8-912b-536c1385d357
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Writing superblocks and filesystem accounting information: done
+
+[root@localhost test]# blkid /dev/sdc1 
+/dev/sdc1: UUID="e3af9176-12be-49b8-912b-536c1385d357" TYPE="ext2" PARTUUID="0ca8a32d-01"
+
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ EXT3[mke2fs -j [disk] ]  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+[root@localhost test]# fdisk /dev/sdc
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 
+First sector (2099200-20971519, default 2099200): 
+Last sector, +sectors or +size{K,M,G,T,P} (2099200-20971519, default 20971519): +2G
+
+Created a new partition 2 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost test]# partprobe 
+[root@localhost test]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0   10G  0 disk 
+├─sdc1          8:33   0    1G  0 part 
+└─sdc2          8:34   0    2G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost test]# mke2fs -j /dev/sdc2 
+mke2fs 1.44.3 (10-July-2018)
+Creating filesystem with 524288 4k blocks and 131072 inodes
+Filesystem UUID: 45f69833-7eca-47f1-86ab-f14be1fb7ea3
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost test]# blkid /dev/sdc2 
+/dev/sdc2: UUID="45f69833-7eca-47f1-86ab-f14be1fb7ea3" SEC_TYPE="ext2" TYPE="ext3" PARTUUID="0ca8a32d-02"
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+Converting ext2 to ext3 fs by enabling journaling [tune2fs -j [disk] ]
+
+
+[root@localhost test]# blkid /dev/sdc1 
+/dev/sdc1: UUID="e3af9176-12be-49b8-912b-536c1385d357" TYPE="ext2" PARTUUID="0ca8a32d-01"
+[root@localhost test]# tune2fs -j /dev/sdc1 
+tune2fs 1.44.3 (10-July-2018)
+Creating journal inode: done
+[root@localhost test]# blkid /dev/sdc1 
+/dev/sdc1: UUID="e3af9176-12be-49b8-912b-536c1385d357" SEC_TYPE="ext2" TYPE="ext3" PARTUUID="0ca8a32d-01"
+[root@localhost test]# 
+
+we can mount ext3 as ext2 we will loose journaling feature
+if we are booting the system booting from this ext2/ext3 device  make sure to run it mkinitrd
+
+https://www.tutorialspoint.com/unix_commands/mkinitrd.htm
+
+==============================================================================================
+
+
+EXT4 -----> supports larger fs [ dev --> worked to support ---> 64 bit OS]
+
+
+mkfs.ext4 [disk/partition]
+
+=========================================================================================
+
+XFS ---> Rhel7 Default fs --> scalable/High performance 
+
+mkfs.xfs [disk/partition]
+
+Con:-  we can't reduce xfs we can only grow/extend the partition
+===============================================================================================
+
+
+VFAT ---> rarely used ---> formats :-
+                           fat12[floppy disk]
+                           fat16[ms -dos]
+                           fat32
+in linux vfat support all this format [ uses:- digital cam,USB sticks to use in diff OS ]
+
+=================================================================================================
+
+ISO9660 ---> cdrom /images mounted as cdrom --> format:- iso
+
+Similar :- joliet
+==============================================================
+
+UDF :- universal disk format 
+
+======================================================
+
+SWAP :- file needs to be format as swap partition
+
+=====================================================
+
+gfs , gfs2 -----> Linux cluster fs
+===============================================================
+
+Note:- list support of fs [ /proc/filesystems ]
+
+=======================================================
+
+Below commands we can use to make fs format
+
+root@localhost test]# ls -l /sbin/mk*
+lrwxrwxrwx. 1 root root     15 Nov 26  2018 /sbin/mkdict -> cracklib-format
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/mkdosfs -> mkfs.fat
+-rwxr-xr-x. 1 root root  12697 Feb 22  2019 /sbin/mkdumprd
+-rwxr-xr-x. 4 root root 143784 Dec 17  2018 /sbin/mke2fs
+-rwxr-xr-x. 1 root root  17952 Dec 11  2018 /sbin/mkfs
+-rwxr-xr-x. 1 root root  44464 Dec 11  2018 /sbin/mkfs.cramfs
+-rwxr-xr-x. 4 root root 143784 Dec 17  2018 /sbin/mkfs.ext2
+-rwxr-xr-x. 4 root root 143784 Dec 17  2018 /sbin/mkfs.ext3
+-rwxr-xr-x. 4 root root 143784 Dec 17  2018 /sbin/mkfs.ext4
+-rwxr-xr-x. 1 root root  40008 Feb 22  2019 /sbin/mkfs.fat
+-rwxr-xr-x. 1 root root  92928 Dec 11  2018 /sbin/mkfs.minix
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/mkfs.msdos -> mkfs.fat
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/mkfs.vfat -> mkfs.fat
+-rwxr-xr-x. 1 root root 507096 Feb  4  2019 /sbin/mkfs.xfs
+-rwxr-xr-x. 1 root root  25736 Dec  7  2018 /sbin/mkhomedir_helper
+-rwxr-xr-x. 1 root root  13352 Dec 17  2018 /sbin/mklost+found
+-rwxr-xr-x. 1 root root 195480 Aug 20  2018 /sbin/mksquashfs
+-rwxr-xr-x. 1 root root  92864 Dec 11  2018 /sbin/mkswap
+[root@localhost test]# 
+
+============================================================
+
+File system tuneing
+
+
+we can do filesystem tuening by  as below  i increase reserved block count 
+======================================================================================
+TUNE2FS(8)                                               System Manager's Manual                                              TUNE2FS(8)
+
+NAME
+       tune2fs - adjust tunable filesystem parameters on ext2/ext3/ext4 filesystems
+
+SYNOPSIS
+       tune2fs  [ -l ] [ -c max-mount-counts ] [ -e errors-behavior ] [ -f ] [ -i interval-between-checks ] [ -I new_inode_size ] [ -j ]
+       [ -J journal-options ] [ -m reserved-blocks-percentage ] [ -o [^]mount-options[,...]  ] [ -r reserved-blocks-count ] [ -u user  ]
+       [  -g  group ] [ -C mount-count ] [ -E extended-options ] [ -L volume-label ] [ -M last-mounted-directory ] [ -O [^]feature[,...]
+       ] [ -Q quota-options ] [ -T time-last-checked ] [ -U UUID ] [ -z undo_file ] device
+===========================================================================================
+
+tune2fs -l [disk] | grep -i "block count"
+
+[root@localhost test]# tune2fs -l /dev/sdc1 | grep -i "block count"
+Block count:              262144
+Reserved block count:     13107
+--------------------------------------------------------------------------------
+-m reserved-blocks-percentage
+              Set the percentage of the filesystem which may only be allocated by  privileged  processes.    Reserving  some  number  of
+              filesystem  blocks for use by privileged processes is done to avoid filesystem fragmentation, and to allow system daemons,
+              such as syslogd(8), to continue to function correctly after non-privileged processes are prevented  from  writing  to  the
+              filesystem.  Normally, the default percentage of reserved blocks is 5%.
+------------------------------------------------------------------------------------
+[root@localhost test]# tune2fs -m10 /dev/sdc1 
+tune2fs 1.44.3 (10-July-2018)
+Setting reserved blocks percentage to 10% (26214 blocks)
+[root@localhost test]# tune2fs -l /dev/sdc1 | grep -i "block count"
+Block count:              262144
+Reserved block count:     26214
+[root@localhost test]#
+-------===========================================================================
+
+to check different filesystem
+
+ls -l /sbin/*fsck*
+---------------------------------------------------------
+[root@localhost test]# ls -l /sbin/*fsck*
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/dosfsck -> fsck.fat
+-rwxr-xr-x. 4 root root 347096 Dec 17  2018 /sbin/e2fsck
+-rwxr-xr-x. 1 root root  56944 Dec 11  2018 /sbin/fsck
+-rwxr-xr-x. 1 root root  44576 Dec 11  2018 /sbin/fsck.cramfs
+-rwxr-xr-x. 4 root root 347096 Dec 17  2018 /sbin/fsck.ext2
+-rwxr-xr-x. 4 root root 347096 Dec 17  2018 /sbin/fsck.ext3
+-rwxr-xr-x. 4 root root 347096 Dec 17  2018 /sbin/fsck.ext4
+-rwxr-xr-x. 1 root root  66688 Feb 22  2019 /sbin/fsck.fat
+-rwxr-xr-x. 1 root root 105432 Dec 11  2018 /sbin/fsck.minix
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/fsck.msdos -> fsck.fat
+lrwxrwxrwx. 1 root root      8 Feb 22  2019 /sbin/fsck.vfat -> fsck.fat
+-rwxr-xr-x. 1 root root   1968 Feb  4  2019 /sbin/fsck.xfs
+[root@localhost test]# 
+---------------------------------------------------------------------------
+
+
+cat /etc/fstab ---> last coloumn will show fs needs to be checked or not. as below 6th/last defines fs needs to be checked or not ---> Higher number represent check order
+
+/dev/mapper/rhel-root   /                       xfs     defaults        0 0
+UUID=56cad9d4-5f7a-485e-82d8-167c69e5df2d /boot                   xfs     defaults        0 0
+/dev/mapper/rhel-swap   swap                    swap    defaults        0 0
+[root@localhost test]# 
+
+0 ---> dont't want to be checked at booting option
+2 ---> for non-root fs needs to be checked at booting option
+1 ---> for root fs needs to be checked at booting option
+
+5th entry for backup related [ dump related backup ]
+
+===========================================================================================
+
+
+Mounting file system
+
+1. Format the partition/FS 
+2. Path to use  partition/FS with type
+
+mount -t [nfs/xfs/ext3/ext2/ext4..] [disk_path] [mount_point]
+
+
+
+========================================================
+
+[root@localhost /]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0   10G  0 disk 
+├─sdc1          8:33   0    1G  0 part 
+└─sdc2          8:34   0    2G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost /]# mkdir /testdir
+[root@localhost /]# mount /dev/sdc1 /testdir/
+[root@localhost /]# cat /etc/filesystems 
+ext4
+ext3
+ext2
+nodev proc
+nodev devpts
+iso9660
+vfat
+hfs
+hfsplus
+*
+[root@localhost /]# df -hTP /testdir/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdc1      ext3  976M  1.3M  873M   1% /testdir
+[root@localhost /]# umount /testdir 
+[root@localhost /]# mount -t ext3 /testdir/
+mount: /testdir/: can't find in /etc/fstab.
+[root@localhost /]# mount -t ext3 /dev/sdc1 /testdir/
+
+cat /proc/mounts [or] /etc/mtab [or] mount ---> will show list  of mountedpoints  
+
+[root@localhost /]# mount | grep root
+/dev/mapper/rhel-root on / type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
+[root@localhost /]# 
+
+[/etc/mtab   ---> do not add  it manually ]
+==================================================================================================
+
+df ---> disk free cmd 
+
+-h ---> human readable --> to understand size in GB,MB rather than bytes
+-T ---> Type of FS
+
+[root@localhost /]# df -hTP
+Filesystem            Type      Size  Used Avail Use% Mounted on
+devtmpfs              devtmpfs  1.9G     0  1.9G   0% /dev
+tmpfs                 tmpfs     1.9G     0  1.9G   0% /dev/shm
+tmpfs                 tmpfs     1.9G   10M  1.9G   1% /run
+tmpfs                 tmpfs     1.9G     0  1.9G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root xfs        26G  4.0G   23G  16% /
+/dev/nvme0n1p1        xfs      1014M  169M  846M  17% /boot
+tmpfs                 tmpfs     376M   16K  376M   1% /run/user/42
+tmpfs                 tmpfs     376M  3.4M  373M   1% /run/user/1000
+/dev/sdc1             ext3      976M  1.3M  873M   1% /testdir
+
+
+=============================================================================================
+
+
+du ---> disk space  ---> calculate parent and child dire/files recursively
+
+[root@localhost /]# du -sh /boot
+130M	/boot
+[root@localhost /]# 
+
+=========================================================
+/etc/fstab [file system table] ---> permananet mounting 
+
+syntax:-
+[device]              [mount point]          [FS type] [options] [backup_operations] [filesystem check order]
+
+/dev/mapper/rhel-root   /                       xfs     defaults        0                     0
+
+
+filesystem check order :-
+
+1- for root fs 
+2 - non-root fs
+0- no check of fs
+
+backup_operations:-
+
+1 ---> dump data/utility 
+0 ---> disable
+
+
+mount -a ---> mount all fs which mentioned in fstab
+
+
+options:- 
+ro --> readonly
+noexec --> not to execute bin
+nosuid ---> ignore setuid binaries
+noacl  
+group quota, user quota
+
+
+
+mount -t [type] -o ro [disk_path] [mount point]
+
+
+[root@localhost /]# mount -t ext3 -o ro /dev/sdc1 /testdir/
+[root@localhost /]# mount | grep sdc1
+/dev/sdc1 on /testdir type ext3 (ro,relatime,seclabel)
+[root@localhost /]# df -hTP /testdir/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdc1      ext3  976M  1.3M  873M   1% /testdir
+[root@localhost /]# 
+
+
+
+[root@localhost /]# mount | grep /testdir/
+[root@localhost /]# mount | grep sdc1
+/dev/sdc1 on /testdir type ext3 (ro,relatime,seclabel)
+[root@localhost /]# df -hTP /testdir/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdc1      ext3  976M  1.3M  873M   1% /testdir
+[root@localhost /]# umount /testdir 
+[root@localhost /]# mount -t ext3 -o noexec /dev/sdc1 /testdir/
+[root@localhost /]# cat /etc/mtab | grep sdc1
+/dev/sdc1 /testdir ext3 rw,seclabel,noexec,relatime 0 0
+[root@localhost /]# cd /testdir/
+[root@localhost testdir]# vim sc.sh
+[root@localhost testdir]# cat sc.sh 
+cal
+[root@localhost testdir]# chmod +x sc.sh 
+[root@localhost testdir]# ./sc.sh
+-bash: ./sc.sh: Permission denied
+[root@localhost testdir]# cd 
+[root@localhost ~]# umount /testdir 
+[root@localhost ~]# mount -t ext3 -o noexec,ro,noacl /dev/sdc1 /testdir/
+[root@localhost ~]# cat /etc/mtab | grep sdc1
+/dev/sdc1 /testdir ext3 ro,seclabel,noexec,relatime,noacl 0 0
+[root@localhost ~]# 
+
+
+
+Mount Remote File Types:-
+
+CIFS:-
+
+mount -t cifs -o user=[user_name] //[ip_address]/[name_of_share] [mount_point]
+
+mount -t cifs -o user=afridi //10.19.10.1/data2 /home	
+
+
+NFS:-
+
+mount -t nfs [hostname_of_server]:[mount_point_location] [mount_path]
+
+mount -t nfs server32:/srv/data /home
+
+============================================================================================
+
+
+

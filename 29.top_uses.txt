@@ -1,0 +1,195 @@
+top command----> resource management and system process, h/w details 
+
+top -v ---> version of top
+
+top 
+
+
+[system_uptime]    [no.of_users_logged_in]  load average:[1min][5min][15min] --> load on the system
+Tasks: no.of tasks/threads, - running , --- sleeping, - stopped, - zombie
+%Cpu(s): - us[userspace], - sy[kernelspace] , - ni[manual start with nyc value] , - id [CPU ideal] , - wa[wait I/O] , - hi[h/w interrupt, - si[s/w interrupt], - st[steal time]
+MiB Mem : ---[total MegaByte] ,  ---[Free], ---[Used], ---[Buff/cache] 
+MiB Swap: ---[total]          ,  ---[Free], ---[Used], ---[avail Mem]
+
+   PID     USER     PR   NI    VIRT    RES      SHR     S   %CPU   %MEM    TIME+ COMMAND
+
+============================================================================================================================
+Tasks---> process break into chunks of tasks to run on the system based on CPU core count
+
+CPU state code
+us ---> %CPU timespent on user space
+sy ---> time spent on running kernel space process
+ni ---> time spent by CPU in executing process with manual + nice value
+id ---> time in which CPU remains idle
+wa ---> time spent by CPU in waiting for I/O to complete
+hi ---> time spent by CPU in handling hardware interrupts [ rest button, high priorities ]
+si ---> time spent by CPU in handling software interrupts [ depends on priorities]
+st ---> time lost by CPU while it was busy on other VM ---> steal time
+===============================================================================================================================
+
+Buff/Cache---> CPU writing some result/data in memory[RAM] ---> Write Operations ---->Buffer
+               CPU read some result/data in memory [RAM]   ---> Read Operations  ----> Read
+
+------------------------------------------------------------------
+SWAP ---> Virtual Memory --> RAM 70% occupied ---> then swap used  
+
+* CPU needs memeory requirement which beyond RAM memory then SWAP being used ---> Paging concept
+
+
+Note:- SWAP size needs to be half size of RAM/ based on I/O we can double it.
+
+If SWAP is not using then we might see performance Issues
+
+-------------------------------------------
+
+PID ---> process ID
+
+USER ---> userdetails who started the process [ /etc/passwd]
+
+PR   ---> priority [ high no. -- low priority ]
+
+NI   ---> change priority [ PR=NI+20]
+
+VIRT ---> total Mem consumed by Process in system
+
+RES --->  Memory consumed by process in RAM
+
+SHR --->  Shared Memory  with other processes
+
+S  ---> state of the process[ zombie[z/defunct], terminated[t] ]
+
+TIME+ ---> total CPU time utilized by process[ accruate]
+
+COMMAND ---> name of the process/Path/details of started user
+
+------------------------------------------------------------
+
+TOP Shortcuts
+
+k + [pid ] ---> kill the process
+m          ---> sort by Memory
+p          ---> sort by CPU uses
+N          ---> process id's
+T          ---> sort by Time of process
+H          ---> Threads/Tasks
+
+Threads ---> split process/ path of execution process
+
+top -o %[CPU] ---> sort based on CPU usage
+top -h        ---> threads it will show instead of tasks 
+top -c        ---> show full path of command
+top -u [user] ---> show user process
+
+-------------------------------------------------------------------
+Affect Process Priorities & Nice Value
+
+
+Depending on the criticality/ priority  ---> we need make change priority
+
+
+System auto --->  Important Process [High] ---> CPU Time increases
+
+
+
+4 process ---> 2 cores ---> each core run 2 process
+4 process ---> 2 cores ---> need to give 75% CPU time for one process ---> other 25% CPU time spent for other 3 process
+
+
+Priority Value ---> Actual process priority used by Linux Kernel to schedule task.
+[1 - 139  ---> Total 
+ 0 - 99   ---> realtime [ system/kernel]
+ 100 - 139 --> Users ]
+
+Nice Value ----> 
+
+[ -20  to +19 range
+  -20 --> Highest,
+  0   --> Default,
+  +19 --> Lowest
+
+For negative values root user can only assign ]
+
+Relation B/W ---> Prioirty Value & Nice Value
+
+Priory_value = Nice_value + 20
+
+
+1. renice -n [pri_val] [pid]
+======================================== 
+> infinite.sh --->  run in background 
+----------------------------------
+#!/bin/bash
+ 
+for (( ; ; ))
+do
+continue
+done
+---------------------------------
+> renice -n 10 [pid]
+
+pid = current priority + 10  = low priority
+
+> renice -n -10 [pid]
+pid = current priority - 10 = high priority
+
+
+2. renice -n [pri_val] [pid]
+=============================================
+> renice -n -[start_pid] sh infinite.sh
+
+
+Based on process/apps usage CPU will add CPU cores
+
+----------------------------------
+
+
+mkfifo ---> first in firstout
+pipefiles --> process will communicate each other with pipe files
+==================================================================
+
+jobs ---> to check background process
+
+jobs -p ---> will give process id
+
+[command ] & --> will run in background
+
+fg [pid/queue_id in jobs] ---> foreground
+
+bg [pid/queue_id in jobs] ---> background
+
+===================================================================================
+
+
+
+Comments:-
+
+1. CentOS8 Open LDAP configuration --> authcconfig-tui package not avilable --> centos8/rhel8 is not availble
+
+we can't use rhel8/centos8 as a Open LDAP configuration. it's support upto rhel7/centos8
+
+2. under systemd all processes are running as a child process in rhel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
