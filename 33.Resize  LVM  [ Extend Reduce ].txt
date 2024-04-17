@@ -761,6 +761,16 @@ Su Mo Tu We Th Fr Sa
 
 [ If you increase more also you will get the error need to be exact as Size of LV]
 
+
+Before :- 
+[root@localhost /]# lvreduce -L 1G /dev/XFS_VG/XFS_LV 
+  WARNING: Reducing active logical volume to 1.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce XFS_VG/XFS_LV? [y/n]: y
+  Size of logical volume XFS_VG/XFS_LV changed from <3.59 GiB (918 extents) to 1.00 GiB (256 extents).
+  Logical volume XFS_VG/XFS_LV successfully resized.
+
+After:-
   [root@localhost /]# lvextend -L 3.59GiB  /dev/XFS_VG/XFS_LV 
      Rounding size to boundary between physical extents: 3.59 GiB.
      Size of logical volume XFS_VG/XFS_LV changed from 1.00 GiB (256 extents) to 3.59 GiB (920 extents).
