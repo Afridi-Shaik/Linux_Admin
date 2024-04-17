@@ -15,7 +15,7 @@ disk2[/dev/sdb]  ----->  two partitions                              ------> Fre
                         ii. /dev/sdb2 ---> /srv ---> xfs ]
 
 
-1. we have requirement to extend root fs . It's not possible as free space is not availble 
+1. we have requirement to extend root fs . It's not possible as free space is not availble  in /dev/sda disk
 
    a. need to take backup
    b. delete partitions
