@@ -1,0 +1,783 @@
+Resize  LVM  [ Extend/ Reduce ]  ----> ext4/xfs
+
+
+we can use different disk [nvme,scsi, sata ..] ---> create VG and LVM
+
+
+1. create two partiotions from different disk [ /dev/sda ---> sata , /dev/nvme0n2 ---> NvmE ]
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    8G  0 disk 
+sdb             8:16   0    4G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+nvme0n2       259:3    0    5G  0 disk 
+[root@localhost ~]# fdisk -l /dev/sda
+Disk /dev/sda: 8 GiB, 8589934592 bytes, 16777216 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xb3c4c6ad.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 
+First sector (2048-16777215, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-16777215, default 16777215): +3G
+
+Created a new partition 1 of type 'Linux' and of size 3 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    8G  0 disk 
+└─sda1          8:1    0    3G  0 part 
+sdb             8:16   0    4G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+nvme0n2       259:3    0    5G  0 disk 
+[root@localhost ~]# fdisk -l /dev/nvme0n02
+fdisk: cannot open /dev/nvme0n02: No such file or directory
+[root@localhost ~]# fdisk -l /dev/nvme0n2 
+Disk /dev/nvme0n2: 5 GiB, 5368709120 bytes, 10485760 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# fdisk /dev/nvme0n2 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xf0e738aa.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): +2G
+
+Created a new partition 1 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w    
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    8G  0 disk 
+└─sda1          8:1    0    3G  0 part 
+sdb             8:16   0    4G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+nvme0n2       259:3    0    5G  0 disk 
+└─nvme0n2p1   259:4    0    2G  0 part 
+--------------------------------------------------------------------
+
+2. Creating Both Partitons as Physical Volume
+
+[root@localhost ~]# # converting both partitions as pv
+[root@localhost ~]# pvcreate /dev/sda1 
+  Physical volume "/dev/sda1" successfully created.
+[root@localhost ~]# pvcreate /dev/nvme0n2
+nvme0n2    nvme0n2p1  
+[root@localhost ~]# pvcreate /dev/nvme0n2p1 
+  Physical volume "/dev/nvme0n2p1" successfully created.
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0 
+  /dev/nvme0n2p1      lvm2 ---    2.00g 2.00g
+  /dev/sda1           lvm2 ---    3.00g 3.00g
+
+
+3. Creating Both Pvs to volume group
+
+[root@localhost ~]# #creating volume group
+[root@localhost ~]# vgcreate Linux_VG /dev/nvme0n2p1 /dev/sda1 
+  Volume group "Linux_VG" successfully created
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree
+  Linux_VG   2   0   0 wz--n-   4.99g 4.99g
+  rhel       1   2   0 wz--n- <29.00g    0 
+
+4. Creating LV from Volume group  and format ext4 and mount /testdir
+
+
+[root@localhost ~]# #creating LV
+[root@localhost ~]# lvcreate -L 4G -n Linux_LV Linux_VG 
+  Logical volume "Linux_LV" created.
+[root@localhost ~]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-a-----   4.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g 
+
+                                                   
+[root@localhost ~]# #format fs
+[root@localhost ~]# lsblk -l
+NAME              MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                 8:0    0    8G  0 disk 
+sda1                8:1    0    3G  0 part 
+sdb                 8:16   0    4G  0 disk 
+sr0                11:0    1 1024M  0 rom  
+rhel-root         253:0    0   26G  0 lvm  /
+rhel-swap         253:1    0    3G  0 lvm  [SWAP]
+Linux_VG-Linux_LV 253:2    0    4G  0 lvm  
+Linux_VG-Linux_LV 253:2    0    4G  0 lvm  
+nvme0n1           259:0    0   30G  0 disk 
+nvme0n1p1         259:1    0    1G  0 part /boot
+nvme0n1p2         259:2    0   29G  0 part 
+nvme0n2           259:3    0    5G  0 disk 
+nvme0n2p1         259:4    0    2G  0 part 
+[root@localhost ~]# lsblk -f
+NAME                  FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                            
+└─sda1                LVM2_member       bjo4KX-uLKp-Iaru-acwk-CoSM-HWUf-VW0W8K 
+  └─Linux_VG-Linux_LV                                                          
+sdb                                                                            
+sr0                                                                            
+nvme0n1                                                                        
+├─nvme0n1p1           xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2           LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root         xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap         swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+nvme0n2                                                                        
+└─nvme0n2p1           LVM2_member       DgcGgE-9l81-9YQD-6bSG-3DHm-s1OS-dRMD6O 
+  └─Linux_VG-Linux_LV                                                          
+[root@localhost ~]# mkfs.ext4  /dev/Linux_VG/Linux_LV 
+mke2fs 1.44.3 (10-July-2018)
+Creating filesystem with 1048576 4k blocks and 262144 inodes
+Filesystem UUID: cb8bf208-a33e-49b0-9f81-aa093c361d86
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# blkid /dev/
+/dev/mapper/Linux_VG-Linux_LV  /dev/nvme0n1                   /dev/nvme0n2                   /dev/sda1
+/dev/mapper/rhel-root          /dev/nvme0n1p1                 /dev/nvme0n2p1                 /dev/sdb
+/dev/mapper/rhel-swap          /dev/nvme0n1p2                 /dev/sda                       /dev/sr0
+[root@localhost ~]# blkid /dev/mapper/Linux_VG-Linux_LV 
+/dev/mapper/Linux_VG-Linux_LV: UUID="cb8bf208-a33e-49b0-9f81-aa093c361d86" TYPE="ext4"
+[root@localhost ~]# ll /testdir/
+total 0
+[root@localhost ~]# mount /dev/Linux_VG/Linux_LV /testdir/
+[root@localhost ~]# cd /testdir
+[root@localhost testdir]# touch file{1..50}
+[root@localhost testdir]# ls
+file1   file12  file15  file18  file20  file23  file26  file29  file31  file34  file37  file4   file42  file45  file48  file50  file8
+file10  file13  file16  file19  file21  file24  file27  file3   file32  file35  file38  file40  file43  file46  file49  file6   file9
+file11  file14  file17  file2   file22  file25  file28  file30  file33  file36  file39  file41  file44  file47  file5   file7   lost+found
+[root@localhost testdir]# cal >cal.txt
+[root@localhost testdir]# echo " Linux RHCSA practical" > rhcsa.txt
+[root@localhost testdir]# cat rhcsa.txt 
+ Linux RHCSA practical
+[root@localhost testdir]# cd
+[root@localhost ~]# lsblk -f
+NAME                  FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                            
+└─sda1                LVM2_member       bjo4KX-uLKp-Iaru-acwk-CoSM-HWUf-VW0W8K 
+  └─Linux_VG-Linux_LV ext4              cb8bf208-a33e-49b0-9f81-aa093c361d86   /testdir
+sdb                                                                            
+sr0                                                                            
+nvme0n1                                                                        
+├─nvme0n1p1           xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2           LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root         xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap         swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+nvme0n2                                                                        
+└─nvme0n2p1           LVM2_member       DgcGgE-9l81-9YQD-6bSG-3DHm-s1OS-dRMD6O 
+  └─Linux_VG-Linux_LV ext4              cb8bf208-a33e-49b0-9f81-aa093c361d86   /testdir
+[root@localhost ~]# df -hTP /testdir/
+Filesystem                    Type  Size  Used Avail Use% Mounted on
+/dev/mapper/Linux_VG-Linux_LV ext4  3.9G   16M  3.7G   1% /testdir
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree   
+  Linux_VG   2   1   0 wz--n-   4.99g 1016.00m
+  rhel       1   2   0 wz--n- <29.00g       0 
+
+
+5.  LVM Extension [ space availble in VG ---> extend LV ]
+---------------------------------------------------------------------------
+[root@localhost ~]# # we have free space on Linux_VG
+[root@localhost ~]# lvextend -L +1000M /dev/Linux_VG/Linux_LV 
+  Size of logical volume Linux_VG/Linux_LV changed from 4.00 GiB (1024 extents) to <4.98 GiB (1274 extents).
+  Logical volume Linux_VG/Linux_LV successfully resized.
+[root@localhost ~]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----  <4.98g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost ~]# df -hTP /testdir
+Filesystem                    Type  Size  Used Avail Use% Mounted on
+/dev/mapper/Linux_VG-Linux_LV ext4  3.9G   16M  3.7G   1% /testdir
+[root@localhost ~]# # not showing we need to use resize2fs
+[root@localhost ~]# resize2fs /dev/Linux_VG/Linux_LV 
+resize2fs 1.44.3 (10-July-2018)
+Filesystem at /dev/Linux_VG/Linux_LV is mounted on /testdir; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/Linux_VG/Linux_LV is now 1304576 (4k) blocks long.
+
+[root@localhost ~]# df -hTP /testdir
+Filesystem                    Type  Size  Used Avail Use% Mounted on
+/dev/mapper/Linux_VG-Linux_LV ext4  4.9G   16M  4.6G   1% /testdir
+
+
+6. VG extension [ creating another partion from /dev/sda ---> create PV --> extend VG ]
+---------------------------------------------------------------------------
+[root@localhost ~]# #VG extension
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree 
+  Linux_VG   2   1   0 wz--n-   4.99g 16.00m
+  rhel       1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# lsblk
+NAME                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                     8:0    0    8G  0 disk 
+└─sda1                  8:1    0    3G  0 part 
+  └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+sdb                     8:16   0    4G  0 disk 
+sr0                    11:0    1 1024M  0 rom  
+nvme0n1               259:0    0   30G  0 disk 
+├─nvme0n1p1           259:1    0    1G  0 part /boot
+└─nvme0n1p2           259:2    0   29G  0 part 
+  ├─rhel-root         253:0    0   26G  0 lvm  /
+  └─rhel-swap         253:1    0    3G  0 lvm  [SWAP]
+nvme0n2               259:3    0    5G  0 disk 
+└─nvme0n2p1           259:4    0    2G  0 part 
+  └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (2-4, default 2): 
+First sector (6293504-16777215, default 6293504): 
+Last sector, +sectors or +size{K,M,G,T,P} (6293504-16777215, default 16777215): +3G
+
+Created a new partition 2 of type 'Linux' and of size 3 GiB.
+
+Command (m for help): t
+Partition number (1,2, default 2):   
+Hex code (type L to list all codes): 8e
+
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                     8:0    0    8G  0 disk 
+├─sda1                  8:1    0    3G  0 part 
+│ └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+└─sda2                  8:2    0    3G  0 part 
+sdb                     8:16   0    4G  0 disk 
+sr0                    11:0    1 1024M  0 rom  
+nvme0n1               259:0    0   30G  0 disk 
+├─nvme0n1p1           259:1    0    1G  0 part /boot
+└─nvme0n1p2           259:2    0   29G  0 part 
+  ├─rhel-root         253:0    0   26G  0 lvm  /
+  └─rhel-swap         253:1    0    3G  0 lvm  [SWAP]
+nvme0n2               259:3    0    5G  0 disk 
+└─nvme0n2p1           259:4    0    2G  0 part 
+  └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+[root@localhost ~]# pvcreate /dev/sda2 
+  Physical volume "/dev/sda2" successfully created.
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree 
+  Linux_VG   2   1   0 wz--n-   4.99g 16.00m
+  rhel       1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# vgextend Linux_VG /dev/sda2 
+  Volume group "Linux_VG" successfully extended
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree
+  Linux_VG   3   1   0 wz--n-  <7.99g 3.01g
+  rhel       1   2   0 wz--n- <29.00g    0 
+[root@localhost ~]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----  <4.98g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvextend -L 7G /dev/Linux_VG/Linux_LV -r
+  Size of logical volume Linux_VG/Linux_LV changed from <4.98 GiB (1274 extents) to 7.00 GiB (1792 extents).
+  Logical volume Linux_VG/Linux_LV successfully resized.
+resize2fs 1.44.3 (10-July-2018)
+Filesystem at /dev/mapper/Linux_VG-Linux_LV is mounted on /testdir; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/mapper/Linux_VG-Linux_LV is now 1835008 (4k) blocks long.
+
+[root@localhost ~]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   7.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost ~]# df -hT
+Filesystem                    Type      Size  Used Avail Use% Mounted on
+devtmpfs                      devtmpfs  1.9G     0  1.9G   0% /dev
+tmpfs                         tmpfs     1.9G     0  1.9G   0% /dev/shm
+tmpfs                         tmpfs     1.9G   10M  1.9G   1% /run
+tmpfs                         tmpfs     1.9G     0  1.9G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root         xfs        26G  4.0G   23G  16% /
+/dev/nvme0n1p1                xfs      1014M  169M  846M  17% /boot
+tmpfs                         tmpfs     376M   28K  376M   1% /run/user/42
+tmpfs                         tmpfs     376M  3.5M  373M   1% /run/user/1000
+/dev/mapper/Linux_VG-Linux_LV ext4      6.9G   18M  6.5G   1% /testdir
+[root@localhost ~]# cd /testdir/
+[root@localhost testdir]# ls
+cal.txt  file12  file16  file2   file23  file27  file30  file34  file38  file41  file45  file49  file7       rhcsa.txt
+file1    file13  file17  file20  file24  file28  file31  file35  file39  file42  file46  file5   file8
+file10   file14  file18  file21  file25  file29  file32  file36  file4   file43  file47  file50  file9
+file11   file15  file19  file22  file26  file3   file33  file37  file40  file44
+
+
+---------------------------------------------------------------------------
+
+7. LVM reduce 
+
+ > need to  Backup of FS
+ > we need to unmount and reduce 
+ > downtime required
+
+
+
+> Reducing with 2G size
+0% non-contiguous --> means there are no errors in FS
+
+[root@localhost ~]# fsck  -f /dev/Linux_VG/Linux_LV 
+fsck from util-linux 2.32.1
+e2fsck 1.44.3 (10-July-2018)
+Pass 1: Checking inodes, blocks, and sizes
+Pass 2: Checking directory structure
+Pass 3: Checking directory connectivity
+Pass 4: Checking reference counts
+Pass 5: Checking group summary information
+/dev/mapper/Linux_VG-Linux_LV: 63/458752 files (0.0% non-contiguous), 49793/1835008 blocks
+[root@localhost ~]# 
+
+
+>we need to let fs know how much we are reducing. running resize2fs 
+
+
+[root@localhost ~]# resize2fs /dev/Linux_VG/Linux_LV 5G
+resize2fs 1.44.3 (10-July-2018)
+Resizing the filesystem on /dev/Linux_VG/Linux_LV to 1310720 (4k) blocks.
+The filesystem on /dev/Linux_VG/Linux_LV is now 1310720 (4k) blocks long.
+
+[root@localhost ~]# 
+
+
+> reducing lv with 5G and need to check resize2fs it need to show as  Nothing to do ! and verify
+
+[root@localhost ~]# lvreduce -L 5G /dev/Linux_VG/Linux_LV 
+  WARNING: Reducing active logical volume to 5.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce Linux_VG/Linux_LV? [y/n]: y
+  Size of logical volume Linux_VG/Linux_LV changed from 7.00 GiB (1792 extents) to 5.00 GiB (1280 extents).
+  Logical volume Linux_VG/Linux_LV successfully resized.
+[root@localhost ~]# resize2fs /dev/Linux_VG/Linux_LV 5G
+resize2fs 1.44.3 (10-July-2018)
+The filesystem is already 1310720 (4k) blocks long.  Nothing to do!
+[root@localhost ~]# 
+
+[root@localhost ~]# fsck -f /dev/Linux_VG/Linux_LV 
+fsck from util-linux 2.32.1
+e2fsck 1.44.3 (10-July-2018)
+Pass 1: Checking inodes, blocks, and sizes
+Pass 2: Checking directory structure
+Pass 3: Checking directory connectivity
+Pass 4: Checking reference counts
+Pass 5: Checking group summary information
+/dev/mapper/Linux_VG-Linux_LV: 63/327680 files (0.0% non-contiguous), 41056/1310720 blocks
+[root@localhost ~]# 
+
+
+> Mount fs and checked as there is no files are corrupted.
+
+[root@localhost ~]# mount /dev/mapper/Linux_VG-Linux_LV /testdir/
+[root@localhost ~]# cd /testdir/
+[root@localhost testdir]# ls
+cal.txt  file12  file16  file2   file23  file27  file30  file34  file38  file41  file45  file49  file7       rhcsa.txt
+file1    file13  file17  file20  file24  file28  file31  file35  file39  file42  file46  file5   file8
+file10   file14  file18  file21  file25  file29  file32  file36  file4   file43  file47  file50  file9
+file11   file15  file19  file22  file26  file3   file33  file37  file40  file44  file48  file6   lost+found
+[root@localhost testdir]# cat rhcsa.txt 
+ Linux RHCSA practical
+
+------------------------------------------------------------------------------------------------------
+
+
+
+XFS 
+
+
+
+[root@localhost ~]# fdisk -l /dev/sdb 
+Disk /dev/sdb: 4 GiB, 4294967296 bytes, 8388608 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# fdisk /dev/sdb 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x3e993e7f.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-8388607, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-8388607, default 8388607):  
+
+Created a new partition 1 of type 'Linux' and of size 4 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                     8:0    0    8G  0 disk 
+├─sda1                  8:1    0    3G  0 part 
+│ └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+└─sda2                  8:2    0    3G  0 part 
+  └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+sdb                     8:16   0    4G  0 disk 
+└─sdb1                  8:17   0    4G  0 part 
+sr0                    11:0    1 1024M  0 rom  
+nvme0n1               259:0    0   30G  0 disk 
+├─nvme0n1p1           259:1    0    1G  0 part /boot
+└─nvme0n1p2           259:2    0   29G  0 part 
+  ├─rhel-root         253:0    0   26G  0 lvm  /
+  └─rhel-swap         253:1    0    3G  0 lvm  [SWAP]
+nvme0n2               259:3    0    5G  0 disk 
+└─nvme0n2p1           259:4    0    2G  0 part 
+  └─Linux_VG-Linux_LV 253:2    0    5G  0 lvm  /testdir
+[root@localhost ~]# pvcreate /dev/sdb1 
+  Physical volume "/dev/sdb1" successfully created.
+[root@localhost ~]# pvs
+  PV             VG       Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel     lvm2 a--  <29.00g     0 
+  /dev/nvme0n2p1 Linux_VG lvm2 a--   <2.00g     0 
+  /dev/sda1      Linux_VG lvm2 a--   <3.00g     0 
+  /dev/sda2      Linux_VG lvm2 a--   <3.00g <2.99g
+  /dev/sdb1               lvm2 ---   <4.00g <4.00g
+[root@localhost ~]# vgcreate  XFS_VG /dev/sdb1 
+  Volume group "XFS_VG" successfully created
+[root@localhost ~]# vgs
+  VG       #PV #LV #SN Attr   VSize   VFree 
+  Linux_VG   3   1   0 wz--n-  <7.99g <2.99g
+  XFS_VG     1   0   0 wz--n-  <4.00g <4.00g
+  rhel       1   2   0 wz--n- <29.00g     0 
+
+
+
+[root@localhost ~]# lvcreate -L 2G -n XFS_LV XFS_VG 
+  Logical volume "XFS_LV" created.
+[root@localhost ~]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   5.00g                                                    
+  XFS_LV   XFS_VG   -wi-a-----   2.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g    
+
+
+
+
+
+@@@@@@@@@@@@@  Creating XFS file system @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                
+[root@localhost ~]# mkfs.xfs /dev/XFS_VG/XFS_LV 
+meta-data=/dev/XFS_VG/XFS_LV     isize=512    agcount=4, agsize=131072 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=524288, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost ~]# mkdir /xfsdir
+[root@localhost ~]# mount /dev/XFS_VG/XFS_LV /xfsdir/
+[root@localhost ~]# cd /xfsdir/
+[root@localhost xfsdir]# ls
+[root@localhost xfsdir]# df -hTP /xfsdir/
+Filesystem                Type  Size  Used Avail Use% Mounted on
+/dev/mapper/XFS_VG-XFS_LV xfs   2.0G   47M  2.0G   3% /xfsdir
+[root@localhost xfsdir]# touch file{1..20}
+[root@localhost xfsdir]# cal >cal.txt
+[root@localhost xfsdir]# cat cal.txt 
+     April 2024     
+Su Mo Tu We Th Fr Sa
+    1  2  3  4  5  6
+ 7  8  9 10 11 12 13
+14 15 16 17 18 19 20
+21 22 23 24 25 26 27
+28 29 30            
+                    
+[root@localhost xfsdir]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   5.00g                                                    
+  XFS_LV   XFS_VG   -wi-ao----   2.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost xfsdir]# lvextend -L +1024M /dev/XFS_VG/XFS_LV 
+  Size of logical volume XFS_VG/XFS_LV changed from 2.00 GiB (512 extents) to 3.00 GiB (768 extents).
+  Logical volume XFS_VG/XFS_LV successfully resized.
+[root@localhost xfsdir]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   5.00g                                                    
+  XFS_LV   XFS_VG   -wi-ao----   3.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost xfsdir]# xfs_
+xfs_admin      xfs_db         xfs_fsr        xfs_io         xfs_metadump   xfs_quota      xfs_spaceman   
+xfs_bmap       xfs_estimate   xfs_growfs     xfs_logprint   xfs_mkfile     xfs_repair     
+xfs_copy       xfs_freeze     xfs_info       xfs_mdrestore  xfs_ncheck     xfs_rtcp       
+[root@localhost xfsdir]# xfs_growfs /dev/XFS_VG/XFS_LV 
+xfs_growfs: /dev/XFS_VG/XFS_LV is not a mounted XFS filesystem
+[root@localhost xfsdir]# xfs_growfs /testdir/
+xfs_growfs: /testdir/ is not a mounted XFS filesystem
+[root@localhost xfsdir]# cd ..
+[root@localhost /]# xfs_growfs /xfsdir/
+meta-data=/dev/mapper/XFS_VG-XFS_LV isize=512    agcount=4, agsize=131072 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=524288, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+data blocks changed from 524288 to 786432
+[root@localhost /]# 
+
+================================================================================
+
+> Extended XFS in LV from 3GB ---> 4GB
+
+[root@localhost /]# lvextend -L +600M /dev/XFS_VG/XFS_LV -r
+  Size of logical volume XFS_VG/XFS_LV changed from 3.00 GiB (768 extents) to <3.59 GiB (918 extents).
+  Logical volume XFS_VG/XFS_LV successfully resized.
+meta-data=/dev/mapper/XFS_VG-XFS_LV isize=512    agcount=6, agsize=131072 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=786432, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+data blocks changed from 786432 to 940032
+[root@localhost /]# df -hTP /xfsdir/
+Filesystem                Type  Size  Used Avail Use% Mounted on
+/dev/mapper/XFS_VG-XFS_LV xfs   3.6G   59M  3.6G   2% /xfsdir
+[root@localhost /]# 
+
+
+
+
+====================================================================================================
+
+> XFS Reduce  we can't perform
+
+[root@localhost /]# lvreduce -L 1G /dev/XFS_VG/XFS_LV 
+  WARNING: Reducing active logical volume to 1.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce XFS_VG/XFS_LV? [y/n]: y
+  Size of logical volume XFS_VG/XFS_LV changed from <3.59 GiB (918 extents) to 1.00 GiB (256 extents).
+  Logical volume XFS_VG/XFS_LV successfully resized.
+[root@localhost /]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   5.00g                                                    
+  XFS_LV   XFS_VG   -wi-a-----   1.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g                                                    
+[root@localhost /]# mount /dev/XFS_VG/XFS_LV /xfsdir/
+mount: /xfsdir: can't read superblock on /dev/mapper/XFS_VG-XFS_LV.
+[root@localhost /]# 
+
+
+
+Troubleshoot:-
+*********************************************************************************************************************
+1. check with xfs_repair
+
+[root@localhost /]# xfs_repair /dev/XFS_VG/XFS_LV 
+Phase 1 - find and verify superblock...
+superblock read failed, offset 1073741824, size 131072, ag 2, rval 0
+
+fatal error -- No such file or directory
+
+[root@localhost /]# lvs
+  LV       VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Linux_LV Linux_VG -wi-ao----   5.00g                                                    
+  XFS_LV   XFS_VG   -wi-a-----   1.00g                                                    
+  root     rhel     -wi-ao---- <26.00g                                                    
+  swap     rhel     -wi-ao----   3.00g   
+
+
+2. Extend Exact space of previous xfs and run xfs_repair and checked there is no data corruption is happend
+
+                                                 
+[root@localhost /]# lvextend -L 3.59GiB  /dev/XFS_VG/XFS_LV -r
+  Rounding size to boundary between physical extents: 3.59 GiB.
+Phase 1 - find and verify superblock...
+superblock read failed, offset 1073741824, size 131072, ag 2, rval 0
+
+fatal error -- No such file or directory
+  Filesystem check failed.
+[root@localhost /]# lvextend -L 3.59GiB  /dev/XFS_VG/XFS_LV 
+  Rounding size to boundary between physical extents: 3.59 GiB.
+  Size of logical volume XFS_VG/XFS_LV changed from 1.00 GiB (256 extents) to 3.59 GiB (920 extents).
+  Logical volume XFS_VG/XFS_LV successfully resized.
+[root@localhost /]# xfs_repair /dev/XFS_VG/XFS_LV 
+Phase 1 - find and verify superblock...
+Phase 2 - using internal log
+        - zero log...
+        - scan filesystem freespace and inode maps...
+        - found root inode chunk
+Phase 3 - for each AG...
+        - scan and clear agi unlinked lists...
+        - process known inodes and perform inode discovery...
+        - agno = 0
+        - agno = 1
+        - agno = 2
+        - agno = 3
+        - agno = 4
+        - agno = 5
+        - agno = 6
+        - agno = 7
+        - process newly discovered inodes...
+Phase 4 - check for duplicate blocks...
+        - setting up duplicate extent list...
+        - check for inodes claiming duplicate blocks...
+        - agno = 0
+        - agno = 1
+        - agno = 5
+        - agno = 2
+        - agno = 7
+        - agno = 4
+        - agno = 6
+        - agno = 3
+Phase 5 - rebuild AG headers and trees...
+        - reset superblock...
+Phase 6 - check inode connectivity...
+        - resetting contents of realtime bitmap and summary inodes
+        - traversing filesystem ...
+        - traversal finished ...
+        - moving disconnected inodes to lost+found ...
+Phase 7 - verify and correct link counts...
+done
+[root@localhost /]# mount /dev/XFS_VG/XFS_LV /xfsdir/
+[root@localhost /]# cd /xfsdir/
+[root@localhost xfsdir]# ls
+cal.txt  file10  file12  file14  file16  file18  file2   file3  file5  file7  file9
+file1    file11  file13  file15  file17  file19  file20  file4  file6  file8
+[root@localhost xfsdir]# cat cal.txt 
+     April 2024     
+Su Mo Tu We Th Fr Sa
+    1  2  3  4  5  6
+ 7  8  9 10 11 12 13
+14 15 16 17 18 19 20
+21 22 23 24 25 26 27
+28 29 30            
+                    
+[root@localhost xfsdir]# 
+
+
+[ If you increase more also you will get the error need to be exact as Size of LV]
+
+  [root@localhost /]# lvextend -L 3.59GiB  /dev/XFS_VG/XFS_LV 
+     Rounding size to boundary between physical extents: 3.59 GiB.
+     Size of logical volume XFS_VG/XFS_LV changed from 1.00 GiB (256 extents) to 3.59 GiB (920 extents).
+     Logical volume XFS_VG/XFS_LV successfully resized.
+
+
+
+==================================================================================================================================
+
+
+Comments:-
+
+1. why resize2fs needed before decreaing lv 
+
+we need to tell system how much we need to reduce -----> if we directly reduce lv then ---> file system will corruption will happen definitely after 2/3days
+
+
+
+
+
