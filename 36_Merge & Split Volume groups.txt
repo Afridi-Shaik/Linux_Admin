@@ -1,0 +1,514 @@
+Merge & Split Volume groups
+
+
+
+
+1 extent = 4MB ---> in Linux[ rhel8] ---> PE size in vgdisplay
+
+
+
+Pre requisites:-
+
+> Downtime Required [ we need to deactive VG which we are going to merge ]
+> unmount & Mount FS
+> Backup is not required we can perform ON THE GO
+
+Purpose :-
+> Volume groups ---> Virtual Phenomena
+> when we have multiple unnessary  volume group we can merge ----> vgmerge
+> when we need to create dedicated volume group/ need to split  multiple volume groups  ---> vgsplit
+
+
+
+================================================================
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda 
+Disk /dev/sda: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x7409a5c3
+[root@localhost ~]# fdisk /dev/sda
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-20971519, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-20971519, default 20971519): +5G
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (2-4, default 2): 
+First sector (10487808-20971519, default 10487808): 
+Last sector, +sectors or +size{K,M,G,T,P} (10487808-20971519, default 20971519): 
+
+Created a new partition 2 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Partition number (1,2, default 2): 
+Hex code (type L to list all codes): 8e
+
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk 
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+├─sda1          8:1    0    5G  0 part 
+└─sda2          8:2    0    5G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# pvcreate /dev/sda1 /dev/sda2 
+  Physical volume "/dev/sda1" successfully created.
+  Physical volume "/dev/sda2" successfully created.
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g     0 
+  /dev/sda1           lvm2 ---    5.00g  5.00g
+  /dev/sda2           lvm2 ---   <5.00g <5.00g
+[root@localhost ~]# vgcreate VG_1 /dev/sda1 
+  Volume group "VG_1" successfully created
+[root@localhost ~]# vgcreate VG_2 /dev/sda2 
+  Volume group "VG_2" successfully created
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  VG_1   1   0   0 wz--n-  <5.00g <5.00g
+  VG_2   1   0   0 wz--n-  <5.00g <5.00g
+  rhel   1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# lvcreate -l 1000 -n LV_1 VG_1
+WARNING: ext4 signature detected on /dev/VG_1/LV_1 at offset 1080. Wipe it? [y/n]: y
+  Wiping ext4 signature on /dev/VG_1/LV_1.
+  Logical volume "LV_1" created.
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  LV_1 VG_1 -wi-a-----  <3.91g                                                    
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# vgdisplay  | grep PE
+  PE Size               4.00 MiB
+  Total PE              1279
+  Alloc PE / Size       0 / 0   
+  Free  PE / Size       1279 / <5.00 GiB
+  PE Size               4.00 MiB
+  Total PE              7423
+  Alloc PE / Size       7423 / <29.00 GiB
+  Free  PE / Size       0 / 0   
+  PE Size               4.00 MiB
+  Total PE              1279
+  Alloc PE / Size       1000 / <3.91 GiB
+  Free  PE / Size       279 / <1.09 GiB
+[root@localhost ~]# lvcreate -l 1000 -n LV_2 VG_2
+  Logical volume "LV_2" created.
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  LV_1 VG_1 -wi-a-----  <3.91g                                                    
+  LV_2 VG_2 -wi-a-----  <3.91g                                                    
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# mkfs.ext4 /dev/VG_1/LV_1 
+mke2fs 1.44.3 (10-July-2018)
+Creating filesystem with 1024000 4k blocks and 256000 inodes
+Filesystem UUID: ea96e4f6-41b0-4f63-8b68-c9a5c594c8b4
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+
+
+[root@localhost ~]# mkfs.xfs  /dev/VG_2/LV_2 
+meta-data=/dev/VG_2/LV_2         isize=512    agcount=4, agsize=256000 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=1024000, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+├─sda1        LVM2_member       xBErJk-P5rC-66Ob-1Q1Q-R14t-9KPP-N3mdbf 
+│ └─VG_1-LV_1 ext4              ea96e4f6-41b0-4f63-8b68-c9a5c594c8b4   
+└─sda2        LVM2_member       BMah9Z-4WpJ-FTXA-20M9-wvpF-CnFX-NeTjKt 
+  └─VG_2-LV_2 xfs               6dfec0aa-ac76-4a08-989c-b6dc9262868e   
+sr0                                                                    
+nvme0n1                                                                
+├─nvme0n1p1   xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2   LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# 
+
+
+
+root@localhost ~]# mkdir /test1 /test2
+[root@localhost ~]# mount /dev/VG_1/LV_1  /test1/
+[root@localhost ~]# mount /dev/VG_2/LV_2  /test2/
+[root@localhost ~]# df -hT  | grep test
+/dev/mapper/VG_1-LV_1 ext4      3.8G   16M  3.6G   1% /test1
+/dev/mapper/VG_2-LV_2 xfs       3.9G   61M  3.9G   2% /test2
+[root@localhost ~]# cd /test1/
+
+[root@localhost test1]# ls
+lost+found
+[root@localhost test1]# touch {1..10}
+[root@localhost test1]# cal >cal.txt
+[root@localhost test1]# mkdir aa bb cc dd
+[root@localhost test1]# ls
+1  10  2  3  4  5  6  7  8  9  aa  bb  cal.txt  cc  dd  lost+found
+[root@localhost test1]# cd /test2/
+[root@localhost test2]# touch {11..20}
+[root@localhost test2]# cal >cal.txt
+[root@localhost test2]# mkdir ee ff gg hh
+[root@localhost test2]# ls
+11  12  13  14  15  16  17  18  19  20  cal.txt  ee  ff  gg  hh
+[root@localhost test2]# 
+=============================================================================================
+
+ Merge two or more VG
+
+1. unmount the fs
+---------------------------------------------------------------
+[root@localhost ~]# umount /test*
+[root@localhost ~]#
+
+
+2. While Merging another Volume group We need to deactivate like  below we are merging VG2 to VG1  so we need to deacitvate VG2
+
+Syntax:-
+   
+  vgchange -an [VG_Name]
+---------------------------------------------------------------------------------
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/VG_2/LV_2' [<3.91 GiB] inherit
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+[root@localhost ~]#
+
+
+
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  VG_1   1   1   0 wz--n-  <5.00g <1.09g
+  VG_2   1   1   0 wz--n-  <5.00g <1.09g
+  rhel   1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# vgscan
+  Reading all physical volumes.  This may take a while...
+  Found volume group "VG_2" using metadata type lvm2
+  Found volume group "rhel" using metadata type lvm2
+  Found volume group "VG_1" using metadata type lvm2
+
+[root@localhost ~]# vgchange -an VG_2 
+  0 logical volume(s) in volume group "VG_2" now active
+[root@localhost ~]# 
+
+
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  LV_1 VG_1 -wi-a-----  <3.91g                                                    
+  LV_2 VG_2 -wi-------  <3.91g                                                    
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvscan
+  inactive          '/dev/VG_2/LV_2' [<3.91 GiB] inherit
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+[root@localhost ~]# 
+------------------------------------------------------------------------
+3. Need to Merge vgmerge  + now we got both LV_1 & LV_2 under VG_1 
+
+Syntax:-
+
+vgmerge [Main_VG_Name] [Merge_VG_Name]
+
+[root@localhost ~]# vgmerge  VG_1 VG_2 
+  Volume group "VG_2" successfully merged into "VG_1"
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  VG_1   2   2   0 wz--n-   9.99g <2.18g
+  rhel   1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# 
+
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  LV_1 VG_1 -wi-a-----  <3.91g                                                    
+  LV_2 VG_1 -wi-------  <3.91g                                                    
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# 
+
+-------------------------------------------------------------------------------------------
+
+4.we could see  LV_2 is inactivate state
+
+
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+  inactive          '/dev/VG_1/LV_2' [<3.91 GiB] inherit
+[root@localhost ~]# 
+
+Method :- 
+**********************************************
+ we need to activate all LVs under one VG  we can use  vgchange -ay
+*****************************************************
+Method :-2
+********************
+we need to activate specific LV we can use lvchange -ay
+****************************************************
+
+
+[root@localhost ~]# lvchange -ay /dev/VG_1/LV_2 
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  LV_1 VG_1 -wi-a-----  <3.91g                                                    
+  LV_2 VG_1 -wi-a-----  <3.91g                                                    
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_2' [<3.91 GiB] inherit
+[root@localhost ~]# 
+
+**************************************************************
+
+
+[root@localhost ~]# mount /dev/VG_1/LV_1 /test1
+[root@localhost ~]# mount /dev/VG_1/LV_2 /test2
+
+[root@localhost ~]# cd /test2/
+[root@localhost test2]# ls
+11  12  13  14  15  16  17  18  19  20  cal.txt  ee  ff  gg  hh
+
+[root@localhost test2]# pwd
+/test2
+
+[root@localhost test2]# df -hTP | grep test
+/dev/mapper/VG_1-LV_1 ext4      3.8G   16M  3.6G   1% /test1
+/dev/mapper/VG_1-LV_2 xfs       3.9G   61M  3.9G   2% /test2
+[root@localhost test2]# 
+
+
+=======================================================================================================
+
+Split Volume Groups
+
+
+1. unmount the FS
+
+[root@localhost ~]# umount /test1 /test2 
+[root@localhost ~]# df -hTP | grep test
+[root@localhost ~]# 
+
+----------------------------------------------------------------------
+2. deactive VG_1  [ we are trying to split VG_2 on basis of /dev/sda2 pv ]
+--------------------------------------------------------
+
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g     0 
+  /dev/sda1      VG_1 lvm2 a--   <5.00g <1.09g
+  /dev/sda2      VG_1 lvm2 a--   <5.00g <1.09g
+
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  VG_1   2   2   0 wz--n-   9.99g <2.18g
+  rhel   1   2   0 wz--n- <29.00g     0 
+
+[root@localhost ~]# vgchange -an VG_1 
+  0 logical volume(s) in volume group "VG_1" now active
+[root@localhost ~]#
+
+
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  inactive          '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+  inactive          '/dev/VG_1/LV_2' [<3.91 GiB] inherit
+[root@localhost ~]# 
+
+
+-----------------------------------------------------------------------------
+3. Soliting VG with PV basis
+
+Syntax:- vgsplit [Existing_VG] [New_VG]  [PV_disk]
+-------------------------------------------------------------------------
+
+[root@localhost ~]# vgsplit  VG_1  VG_2 /dev/sda2 
+  New volume group "VG_2" successfully split from "VG_1"
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  VG_1   1   1   0 wz--n-  <5.00g <1.09g
+  VG_2   1   1   0 wz--n-  <5.00g <1.09g
+  rhel   1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# lvscan
+  inactive          '/dev/VG_2/LV_2' [<3.91 GiB] inherit
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  inactive          '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+[root@localhost ~]# 
+
+----------------------------------------------------------------
+4. Need to activate VG_1 & VG_2
+-------------------------------------------------------------
+[root@localhost ~]# lvscan
+  inactive          '/dev/VG_2/LV_2' [<3.91 GiB] inherit
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  inactive          '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+[root@localhost ~]# vgchange -ay VG_1 VG_2 
+  1 logical volume(s) in volume group "VG_1" now active
+  1 logical volume(s) in volume group "VG_2" now active
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/VG_2/LV_2' [<3.91 GiB] inherit
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+  ACTIVE            '/dev/VG_1/LV_1' [<3.91 GiB] inherit
+[root@localhost ~]#
+
+-------------------------------------------------------------------
+5. Mounting and checking the data
+-------------------------------------------------------------------------
+
+[root@localhost ~]# mount /dev/VG_1/LV_1 /test1
+[root@localhost ~]# mount /dev/VG_2/LV_2 /test2
+[root@localhost ~]# df -hTP | grep test
+/dev/mapper/VG_1-LV_1 ext4      3.8G   16M  3.6G   1% /test1
+/dev/mapper/VG_2-LV_2 xfs       3.9G   61M  3.9G   2% /test2
+[root@localhost ~]# 
+
+
+
+[root@localhost ~]# cd /test2
+[root@localhost test2]# ls
+11  12  13  14  15  16  17  18  19  20  cal.txt  ee  ff  gg  hh
+[root@localhost test2]# cd /test1/
+[root@localhost test1]# ls
+1  10  2  3  4  5  6  7  8  9  aa  bb  cal.txt  cc  dd  lost+found
+[root@localhost test1]# 
+
+============================================================================================
+
+
+Note:-
+
+> Data actually stored in partiions or PVs---> not in VG or LV ---> This all are virtual phenomena
+
+
+============================================================================
+
+Comments:-
+
+1. One disk fail in LVM  
+ IF in logical volume disk failed ---> data will be corrupted ---> If we are not using RAID
+If we are using RAID ---> we can change with new disk and data will be recovered 
+
+
+Disk ---> we don't directly use for physical servers ---> we only  use RAID  and LVM is also configured on RAID
+-------------------------------------------------------------------
+2. IF we merge/split on Active LVM
+
+data corruption will happen we need to deactivate
+
+--------------------------------------------------------
+
+3. vgcfgrestore ---> restore from metadata volume group files [ /etc/lvm/archive] ---> IT makes easier to find and recover file with timestamp
+
+
+
+[root@localhost ~]# vgcfgrestore  --list VG_1 
+   
+  File:		/etc/lvm/archive/VG_1_00000-1492571556.vg
+  Couldn't find device with uuid xBErJk-P5rC-66Ob-1Q1Q-R14t-9KPP-N3mdbf.
+  VG name:    	VG_1
+  Description:	Created *before* executing 'vgcreate VG_1 /dev/sda1'
+  Backup Time:	Sun Apr 21 19:54:44 2024
+
+   
+  File:		/etc/lvm/archive/VG_1_00001-56297153.vg
+  VG name:    	VG_1
+  Description:	Created *before* executing 'lvcreate -l 1000 -n LV_1 VG_1'
+  Backup Time:	Sun Apr 21 19:56:22 2024
+
+   
+  File:		/etc/lvm/archive/VG_1_00002-744348153.vg
+  VG name:    	VG_1
+  Description:	Created *before* executing 'vgmerge VG_1 VG_2'
+  Backup Time:	Sun Apr 21 20:10:40 2024
+
+   
+  File:		/etc/lvm/archive/VG_1_00003-857923246.vg
+  Couldn't find device with uuid BMah9Z-4WpJ-FTXA-20M9-wvpF-CnFX-NeTjKt.
+  VG name:    	VG_1
+  Description:	Created *before* executing 'vgsplit VG_1 VG_2 /dev/sda2'
+  Backup Time:	Sun Apr 21 20:29:04 2024
+
+   
+  File:		/etc/lvm/backup/VG_1
+  VG name:    	VG_1
+  Description:	Created *after* executing 'vgsplit VG_1 VG_2 /dev/sda2'
+  Backup Time:	Sun Apr 21 20:29:04 2024
+
+[root@localhost ~]# 
+
+------------------------------------------------------------------------------------
+
+4. 
+
+RAID ---> LVM COnfiguration ---> again configure RAID on LVM
+
+
+LVM ---> RAID ---> Again configure RAID on LVM 
+
