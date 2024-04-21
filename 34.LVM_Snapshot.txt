@@ -1,0 +1,522 @@
+LVM Snapshot  [ Data will take from VG ] ----> Small amount of Data [ Better Option]  ---> Frequent backup / not long time backup  ---
+
+
+
+Backup ----> Linux Admin --->  FS/ data backup ---> hourly/incremental[TSM] /complete backup[VM datastore] it will run at certain time  ---> take much more time [critical activity]
+
+
+Snapshot ----> small amount of changes in FS { fs is growing continously means not best option to take LVM snapshot backup}
+
+
+Step:- 1 create PV--> VG --> LV  + some data 
+*========================================================================================*
+
+Setup Environment :- 
+
+--------------------------------------------------------------------
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda 
+Disk /dev/sda: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xa47215ae.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-20971519, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-20971519, default 20971519): +5G    
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (2-4, default 2): 
+First sector (10487808-20971519, default 10487808): 
+Last sector, +sectors or +size{K,M,G,T,P} (10487808-20971519, default 20971519): 
+
+Created a new partition 2 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Partition number (1,2, default 2):   
+Hex code (type L to list all codes): 8e
+
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+├─sda1          8:1    0    5G  0 part 
+└─sda2          8:2    0    5G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# vgcreate System_VG /dev/sda1 
+  Physical volume "/dev/sda1" successfully created.
+  Volume group "System_VG" successfully created
+[root@localhost ~]# pvs
+  PV             VG        Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel      lvm2 a--  <29.00g     0 
+  /dev/sda1      System_VG lvm2 a--   <5.00g <5.00g
+[root@localhost ~]# vgs
+  VG        #PV #LV #SN Attr   VSize   VFree 
+  System_VG   1   0   0 wz--n-  <5.00g <5.00g
+  rhel        1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# lvcreate -L 3G -n Data_LV System_VG 
+  Logical volume "Data_LV" created.
+[root@localhost ~]# lvs
+  LV      VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV System_VG -wi-a-----   3.00g                                                    
+  root    rhel      -wi-ao---- <26.00g                                                    
+  swap    rhel      -wi-ao----   3.00g                                                    
+[root@localhost ~]# mkfs.ext4 /dev/System_VG/Data_LV 
+mke2fs 1.44.3 (10-July-2018)
+Creating filesystem with 786432 4k blocks and 196608 inodes
+Filesystem UUID: c9ab721e-dc28-4cc8-a348-93674fca912a
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# lsblk -f
+NAME                  FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                            
+├─sda1                LVM2_member       d5zTbu-mVAo-LoHi-gHCU-I0kK-KjPs-xUCRSR 
+│ └─System_VG-Data_LV ext4              c9ab721e-dc28-4cc8-a348-93674fca912a   
+└─sda2                                                                         
+sr0                                                                            
+nvme0n1                                                                        
+├─nvme0n1p1           xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2           LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root         xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap         swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# mkdir /data/
+mkdir: cannot create directory ‘/data/’: File exists
+[root@localhost ~]# cd /data/
+[root@localhost data]# ls
+[root@localhost data]# pwd
+/data
+[root@localhost data]# cd
+[root@localhost ~]# mount /dev/System_VG/Data_LV /data/
+[root@localhost ~]# cd /data/
+[root@localhost data]# touch file{1..5}.txt
+[root@localhost data]# ll
+total 16
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file1.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file2.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file3.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file4.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file5.txt
+drwx------. 2 root root 16384 Apr 21 16:21 lost+found
+[root@localhost data]# cal >cal.txt
+[root@localhost data]# mkdir aa bb cc dd
+[root@localhost data]# echo Linux Admin [RHCSA] tuts >rhcsa.txt
+[root@localhost data]# ll
+total 40
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 aa
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 bb
+-rw-r--r--. 1 root root   168 Apr 21 16:23 cal.txt
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 cc
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 dd
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file1.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file2.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file3.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file4.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file5.txt
+drwx------. 2 root root 16384 Apr 21 16:21 lost+found
+-rw-r--r--. 1 root root    25 Apr 21 16:24 rhcsa.txt
+[root@localhost data]# cp -r /usr/sbin/ .
+[root@localhost data]# ls
+aa  bb  cal.txt  cc  dd  file1.txt  file2.txt  file3.txt  file4.txt  file5.txt  lost+found  rhcsa.txt  sbin
+[root@localhost data]# du -sch /data/\
+> 
+68M	/data/
+68M	total
+[root@localhost data]# cd
+[root@localhost ~]# 
+
+*=========================================================================================================================*
+
+Step:-2 LVM snapshot needs to create Used size [ 10 -20 %  more] or to keep larger backup need to create   same size of LV 
+
+Syntax:-
+lvcreate -L [size] -s -n [New_LVname] [LVpath_Snap_bkp]
+
+-s ---> Snapshot backup
+----------------------------------------------------------------------------------------
+
+
+[root@localhost ~]# lvcreate -L 1G -s -n Lv_Snap_data /dev/System_VG/Data_LV
+  Logical volume "Lv_Snap_data" created.
+[root@localhost ~]# lvs
+  LV           VG        Attr       LSize   Pool Origin  Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV      System_VG owi-aos---   3.00g                                                     
+  Lv_Snap_data System_VG swi-a-s---   1.00g      Data_LV 0.01                                   
+  root         rhel      -wi-ao---- <26.00g                                                     
+  swap         rhel      -wi-ao----   3.00g                                                     
+[root@localhost ~]# 
+
+----------------------------------------------------------------------------------------------------------
+
+Step:-3   Deleting data and restoring 
+
+
+> Deleting data
+
+[root@localhost ~]# cd /data/
+[root@localhost data]# ls
+aa  bb  cal.txt  cc  dd  file1.txt  file2.txt  file3.txt  file4.txt  file5.txt  lost+found  rhcsa.txt  sbin
+[root@localhost data]# rm -rf *
+[root@localhost data]# ls
+[root@localhost data]# 
+
+
+>Unmount FS required
+
+[root@localhost ~]# umount /data 
+[root@localhost ~]# df -hTP /data
+Filesystem            Type  Size  Used Avail Use% Mounted on
+/dev/mapper/rhel-root xfs    26G  4.0G   23G  16% /
+
+
+> Restoration of LVsnapshot & Then lv will removed in FS
+
+[root@localhost ~]# lvconvert  --merge /dev/System_VG/Lv_Snap_data 
+  Merging of volume System_VG/Lv_Snap_data started.
+  System_VG/Data_LV: Merged: 100.00%
+
+[root@localhost ~]# lvs
+  LV      VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV System_VG -wi-a-----   3.00g                                                    
+  root    rhel      -wi-ao---- <26.00g                                                    
+  swap    rhel      -wi-ao----   3.00g                                                    
+[root@localhost ~]# 
+
+
+> LVM deactive and reactive LV and MOunt the FS  ----> restored data will be appear
+
+
+
+[root@localhost ~]# lvs
+  LV      VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV System_VG -wi-a-----   3.00g                                                    
+  root    rhel      -wi-ao---- <26.00g                                                    
+  swap    rhel      -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvchange -an /dev/System_VG/Data_LV 
+[root@localhost ~]# lvs
+  LV      VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV System_VG -wi-------   3.00g                                                    
+  root    rhel      -wi-ao---- <26.00g                                                    
+  swap    rhel      -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvchange -ay /dev/System_VG/Data_LV 
+[root@localhost ~]# lvs
+  LV      VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV System_VG -wi-a-----   3.00g                                                    
+  root    rhel      -wi-ao---- <26.00g                                                    
+  swap    rhel      -wi-ao----   3.00g                                                    
+[root@localhost ~]# mount /dev/System_VG/Data_LV /data/
+[root@localhost ~]# cd /data/
+[root@localhost data]# du -sch /data/
+68M	/data/
+68M	total
+[root@localhost data]# ls
+aa  bb  cal.txt  cc  dd  file1.txt  file2.txt  file3.txt  file4.txt  file5.txt  lost+found  rhcsa.txt  sbin
+[root@localhost data]# ll
+total 60
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 aa
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 bb
+-rw-r--r--. 1 root root   168 Apr 21 16:23 cal.txt
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 cc
+drwxr-xr-x. 2 root root  4096 Apr 21 16:23 dd
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file1.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file2.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file3.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file4.txt
+-rw-r--r--. 1 root root     0 Apr 21 16:23 file5.txt
+drwx------. 2 root root 16384 Apr 21 16:21 lost+found
+-rw-r--r--. 1 root root    25 Apr 21 16:24 rhcsa.txt
+dr-xr-xr-x. 2 root root 20480 Apr 21 16:25 sbin
+[root@localhost data]# uptime
+ 16:39:35 up 22 min,  1 user,  load average: 0.00, 0.01, 0.06
+[root@localhost data]# date
+Sun Apr 21 16:39:38 EDT 2024
+
+
++===============================================================================================================+
+
+
+Snapshot Corruption   ----> With Less size than Used 
+
+
+
+> Creating  LV with 100M 
+-------------------------------------------------------------------
+[root@localhost ~]# lsblk
+NAME                  MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                     8:0    0   10G  0 disk 
+├─sda1                  8:1    0    5G  0 part 
+│ └─System_VG-Data_LV 253:2    0    3G  0 lvm  /data
+└─sda2                  8:2    0    5G  0 part 
+sr0                    11:0    1 1024M  0 rom  
+nvme0n1               259:0    0   30G  0 disk 
+├─nvme0n1p1           259:1    0    1G  0 part /boot
+└─nvme0n1p2           259:2    0   29G  0 part 
+  ├─rhel-root         253:0    0   26G  0 lvm  /
+  └─rhel-swap         253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# lvcreate -L 100M -s -n Lv_Snap_data /dev/System_VG/Data_LV
+  Logical volume "Lv_Snap_data" created.
+[root@localhost ~]# lsblk
+NAME                           MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                              8:0    0   10G  0 disk 
+├─sda1                           8:1    0    5G  0 part 
+│ ├─System_VG-Data_LV-real     253:3    0    3G  0 lvm  
+│ │ ├─System_VG-Data_LV        253:2    0    3G  0 lvm  /data
+│ │ └─System_VG-Lv_Snap_data   253:5    0    3G  0 lvm  
+│ └─System_VG-Lv_Snap_data-cow 253:4    0  100M  0 lvm  
+│   └─System_VG-Lv_Snap_data   253:5    0    3G  0 lvm  
+└─sda2                           8:2    0    5G  0 part 
+sr0                             11:0    1 1024M  0 rom  
+nvme0n1                        259:0    0   30G  0 disk 
+├─nvme0n1p1                    259:1    0    1G  0 part /boot
+└─nvme0n1p2                    259:2    0   29G  0 part 
+  ├─rhel-root                  253:0    0   26G  0 lvm  /
+  └─rhel-swap                  253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]#
+
+
+COW ---> Copy on write  table appears for LV snapshot 
+
+ --- Logical volume ---
+  LV Path                /dev/System_VG/Lv_Snap_data
+  LV Name                Lv_Snap_data
+  VG Name                System_VG
+  LV UUID                prjU5O-0dGD-N7lx-EjzQ-q0uf-IYNL-WAXmG4
+  LV Write Access        read/write
+  LV Creation host, time localhost.localdomain, 2024-04-21 16:45:15 -0400
+  LV snapshot status     active destination for Data_LV
+  LV Status              available
+  # open                 0
+  LV Size                3.00 GiB
+  Current LE             768
+  COW-table size         100.00 MiB
+  COW-table LE           25
+  Allocated to snapshot  0.01%
+  Snapshot chunk size    4.00 KiB
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:5
+   
+[root@localhost ~]# 
+
+---------------------------------------------------------------------------------------
+
+> Creating Dummy File of 1G 
+
+[root@localhost data]#  df -hTP /data
+Filesystem                    Type  Size  Used Avail Use% Mounted on
+/dev/mapper/System_VG-Data_LV ext4  2.9G   77M  2.7G   3% /data
+
+[root@localhost data]# dd if=/dev/zero of=/data/dummy_file2 bs=1G count=1 oflag=dsync
+1+0 records in
+1+0 records out
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 8.36223 s, 128 MB/s
+
+[root@localhost data]#  df -hTP /data
+Filesystem                    Type  Size  Used Avail Use% Mounted on
+/dev/mapper/System_VG-Data_LV ext4  2.9G  1.1G  1.7G  40% /data
+
+[root@localhost data]# ls
+aa  bb  cal.txt  cc  dd  dummy_file2  file1.txt  file2.txt  file3.txt  file4.txt  file5.txt  lost+found  rhcsa.txt  sbin
+[root@localhost data]# 
+
+[root@localhost data]# ls -lh dummy_file2 
+-rw-r--r--. 1 root root 1.0G Apr 21 16:49 dummy_file2
+
+---------------------------------------------------------------------------------
+
+> Snapshot reached 100% data so we can't restore
+
+
+[root@localhost data]# lvs
+  LV           VG        Attr       LSize   Pool Origin  Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV      System_VG owi-aos---   3.00g                                                     
+  Lv_Snap_data System_VG swi-I-s--- 100.00m      Data_LV 100.00                                 
+  root         rhel      -wi-ao---- <26.00g                                                     
+  swap         rhel      -wi-ao----   3.00g                                                     
+[root@localhost data]# 
+
+[root@localhost data]# grep Snapshot /var/log/messages
+Apr 21 16:49:46 localhost lvm[8654]: WARNING: Snapshot System_VG-Lv_Snap_data changed state to: Invalid and should be removed.
+[root@localhost data]# 
+
+
+
+[root@localhost data]# ls
+aa  bb  cal.txt  cc  dd  dummy_file2  file1.txt  file2.txt  file3.txt  file4.txt  file5.txt  lost+found  rhcsa.txt  sbin
+[root@localhost data]# rm -rf *
+[root@localhost data]# cd
+[root@localhost ~]# umount /data 
+[root@localhost ~]# lvconvert  --merge /dev/System_VG/Lv_Snap_data 
+  Unable to merge invalidated snapshot LV System_VG/Lv_Snap_data.
+[root@localhost ~]# 
+
+=====================================================================
+
+Troubleshooting :-
+
+1. Snapshot is reached 80-90% we have possibility to restore as it's 100% so it's corrupted
+
+2. As long as  data is growing in LV we need to extend the LV Snapshot to maintain underthreshold
+
+[ Not make any sense after LVsnapshot corrupted extension  still it's corrupted state]
+
+
+[root@localhost ~]# lvs
+  LV           VG        Attr       LSize   Pool Origin  Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV      System_VG owi-a-s---   3.00g                                                     
+  Lv_Snap_data System_VG swi-I-s--- 100.00m      Data_LV 100.00                                 
+  root         rhel      -wi-ao---- <26.00g                                                     
+  swap         rhel      -wi-ao----   3.00g                                                     
+  
+[root@localhost ~]# lvextend -L +1G /dev/System_VG/Lv_Snap_data 
+  Size of logical volume System_VG/Lv_Snap_data changed from 100.00 MiB (25 extents) to <1.10 GiB (281 extents).
+  Logical volume System_VG/Lv_Snap_data successfully resized.
+
+[root@localhost ~]# lvs
+  LV           VG        Attr       LSize   Pool Origin  Data%  Meta%  Move Log Cpy%Sync Convert
+  Data_LV      System_VG owi-a-s---   3.00g                                                     
+  Lv_Snap_data System_VG swi-I-s---  <1.10g      Data_LV 100.00                                 
+  root         rhel      -wi-ao---- <26.00g                                                     
+  swap         rhel      -wi-ao----   3.00g                                                     
+[root@localhost ~]# 
+
+--------------------------------------------------------------------------
+
+
+
+LVM Snapshot Feature 
+
+
+
+> 
+
+[root@localhost ~]# cat /etc/lvm/lvm.conf | grep snapshot
+	# however using them for snapshot volumes is less efficient, as it
+	#     with snapshots of devices using this type of RAID1 that in the
+	# The --type snapshot|thin option overrides this setting.
+	#   snapshot
+	#     The original snapshot implementation from LVM/DM. It uses an old
+	#     snapshot that mixes data and metadata within a single COW
+	#     is used. It also supports full snapshots.
+	# other than 'error' with mirrored or snapshotted volumes is likely to
+	# Configuration option activation/snapshot_autoextend_threshold.
+	# Auto-extend a snapshot when its usage exceeds this percent.
+	# Also see snapshot_autoextend_percent.
+	# snapshot exceeds 700M, it is extended to 1.2G, and when it exceeds
+	# snapshot_autoextend_threshold = 70
+	snapshot_autoextend_threshold = 100     
+	# Configuration option activation/snapshot_autoextend_percent.
+	# Auto-extending a snapshot adds this percent extra space.
+	# The amount of additional space added to a snapshot is this
+	# snapshot exceeds 700M, it is extended to 1.2G, and when it exceeds
+	# snapshot_autoextend_percent = 20
+	snapshot_autoextend_percent = 20
+	# Set the activation skip flag on new thin snapshot LVs.
+	# set on new thin snapshot LVs.
+	# feature is supported for thin and thin snapshot LVs only.
+	# Configuration option dmeventd/snapshot_library.
+	# The library dmeventd uses when monitoring a snapshot device.
+	# libdevmapper-event-lvm2snapshot.so monitors the filling of snapshots
+	# warning is repeated when 85%, 90% and 95% of the snapshot is filled.
+	snapshot_library = "libdevmapper-event-lvm2snapshot.so"
+[root@localhost ~]#
+
+
+> Need to keep threshold always under 100%
+
+snapshot_autoextend_threshold = 70
+
+
+==================================================
+
+Comments:-
+
+1. is it Same  LVM Snapshot  & Mirroring??
+
+LVM Snapshot ---> Captures FS state & block state
+
+2.
+
+Frequent/Temporary ----> LVM Snapshot
+
+For longterm ---> Backup Utilites  ----> rsync [command ]
+
+  
+3. Port forwarding ---> 3 types --> local / remote /dynamic --->  Firewall Related [ upcoming ]
+
+4. Bonding ---> Network Management  ---> Nic teaming [ two or more links ---> one link down  server will be accessible]
+
+5. Prod Env ----> Not Frequent reboot ---> patching
+
+6. booting process ----> run levels [ Minimal ---> GUI convert]
+
+7. High Availbility Cluster ----> pcs configuration
+
+8. ssh ---> block person ---> deny user name 
+
+
