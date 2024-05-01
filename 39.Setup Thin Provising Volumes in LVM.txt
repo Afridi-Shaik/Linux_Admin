@@ -1,0 +1,488 @@
+Setup Thin Provising Volumes in LVM [Logical Volume Group]
+--------------------------------------------------------------------------
+
+Thin Provising ---> storage space utilize  effecitviely.
+VDO Concept  --->  THin provising
+Layered storage stracts fs ---> Thin Provising  ---> will create pools
+
+
+1. changing PE value
+
+
+====================================================================================
+
+
+VDO concept :-
+
+
+1 file ---> storage space ---> same copy of file resides in different locations/sectors/blocks ---> data is created as duplicate ---> unnessary space 
+
+Solution:- with VDO concept of thin provisiong---->  data resides in one location ----> and other location uses as reference of that data file
+
+we have reduced space 
+
+ 
+                         Machine - A [5GB]
+
+
+
+VolumeGroup [15GB] ----> Machine - B [5GB]  
+
+
+
+                         Machine - C [5GB]
+
+
+New request came from Machine - D for 5GB space  ---> we can't provide as 15GB [ need to extend more 5GB to become 20GB ]
+
+
+Need to provide space on demand ---> we can extend later
+ 
+ 						  Machine - A [5GB]
+
+VolumeGroup [15GB] ---> Created Pool [15GB] ----> Machine - B [5GB]
+ 
+                                                  Machine - C [5GB]
+
+New request came from Machine-D for 5GB space ---> we can provide ---> concept "Over provising" as space is not available
+
+how it can bel allocate 
+
+
+
+ 						  Machine - A [5GB] ---> free space [1GB]
+
+VolumeGroup [15GB] ---> Created Pool [15GB] ----> Machine - B [5GB] ---> free space [2GB]   ----> Can be provided for Machine-D[5GB]
+ 
+                                                  Machine - C [5GB] ---> free space [2GB]
+
+
+Cons:-
+
+> Need  to monitor pool continously . If all machines uses full space then storage will be corrupted.
+
+
+=======================================================================================================================
+
+LVM Thin Provisioning
+===========================================================================================================================
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sdb             8:16   0   50G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sdb 
+Disk /dev/sdb: 50 GiB, 53687091200 bytes, 104857600 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+1. Creating partition of 20GB 
+**********************************************************************************************
+[root@localhost ~]# fdisk /dev/sdb 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x68660e88.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-104857599, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-104857599, default 104857599): +20G
+
+Created a new partition 1 of type 'Linux' and of size 20 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sdb             8:16   0   50G  0 disk 
+└─sdb1          8:17   0   20G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+****************************************************************************
+2. Creating Pv
+
+[root@localhost ~]# pvcreate /dev/sdb1 
+  Physical volume "/dev/sdb1" successfully created.
+************************************************************************************
+
+3. By default Volume groups comes wiith Physical extent of 4MB
+
+   > while creating to set the custom volume we can use -s parameter which define size of PE
+
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree
+  rhel   1   2   0 wz--n- <29.00g    0 
+[root@localhost ~]# vgdisplay | grep PE
+  PE Size               4.00 MiB
+  Total PE              7423
+  Alloc PE / Size       7423 / <29.00 GiB
+  Free  PE / Size       0 / 0   
+
+Syntax:- vgcreate -s [PESIZE] [VG_NAME] [PV/diskname]
+
+[root@localhost ~]# vgcreate -s 32M vg_thin /dev/sdb1 
+  Volume group "vg_thin" successfully created
+[root@localhost ~]# vgdisplay | grep PE
+  PE Size               32.00 MiB
+  Total PE              639
+  Alloc PE / Size       0 / 0   
+  Free  PE / Size       639 / <19.97 GiB
+  PE Size               4.00 MiB
+  Total PE              7423
+  Alloc PE / Size       7423 / <29.00 GiB
+  Free  PE / Size       0 / 0   
+[root@localhost ~]# 
+
+
+Now it's changed PE size 4MB ----> 32MB and total we have 639 PE's
+
+*****************************************************************************************************************************
+
+
+4. Now we are creating LVM THin Pool Just need to mention --thinpool parameter while creating LV
+
+Attributes ---> t ---> thin provising
+
+[root@localhost ~]# lvcreate -L 15G --thinpool  Linux_tp_pool vg_thin
+  Thin pool volume with chunk size 64.00 KiB can address at most 15.81 TiB of data.
+  Logical volume "Linux_tp_pool" created.
+
+[root@localhost ~]# lvs
+  LV            VG      Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root          rhel    -wi-ao---- <26.00g                                                    
+  swap          rhel    -wi-ao----   3.00g                                                    
+  Linux_tp_pool vg_thin twi-a-tz--  15.00g             0.00   10.29                           
+[root@localhost ~]# 
+
+***************************************************************************************************************************
+Bonus :-
+
+For more Infor lvdisplay [vg_name]
+
+[root@localhost ~]# lvdisplay vg_thin
+  --- Logical volume ---
+  LV Name                Linux_tp_pool
+  VG Name                vg_thin
+  LV UUID                EukAcN-QzGA-IO65-JQGL-fvnL-4PIi-ZsTeol
+  LV Write Access        read/write
+  LV Creation host, time localhost.localdomain, 2024-05-01 10:12:40 -0400
+  LV Pool metadata       Linux_tp_pool_tmeta
+  LV Pool data           Linux_tp_pool_tdata
+  LV Status              available
+  # open                 0
+  LV Size                15.00 GiB
+  Allocated pool data    0.00%
+  Allocated metadata     10.29%
+  Current LE             480
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:4
+[root@localhost ~]# 
+
+***********************************************************************************************************************************
+
+5. Need to create Logical Volume from LVM thin pool
+
+Syntax:- lvcreate -V [size] --thin -n [Logical_voulme_name] [thin_vg_name/thin_LVM_pool_name]
+
+[root@localhost ~]# lvcreate -V 5G --thin -n thin_vol_client1 vg_thin/Linux_tp_pool
+  Logical volume "thin_vol_client1" created.
+[root@localhost ~]# lvs
+  LV               VG      Attr       LSize   Pool          Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root             rhel    -wi-ao---- <26.00g                                                             
+  swap             rhel    -wi-ao----   3.00g                                                             
+  Linux_tp_pool    vg_thin twi-aotz--  15.00g                      0.00   10.30                           
+  thin_vol_client1 vg_thin Vwi-a-tz--   5.00g Linux_tp_pool        0.00                                   
+[root@localhost ~]#
+
+*************************************************************************************************************
+
+6.we have create 2 extra logical voume 
+
+LVM_POOL_SIZE=15GB ---> client1[5GB]
+			client2[5GB]
+			client3[5GB]
+
+[root@localhost ~]# lvcreate -V 5G --thin -n thin_vol_client2 vg_thin/Linux_tp_pool
+  Logical volume "thin_vol_client2" created.
+[root@localhost ~]# lvcreate -V 5G --thin -n thin_vol_client3 vg_thin/Linux_tp_pool
+  Logical volume "thin_vol_client3" created.
+[root@localhost ~]# lvs
+  LV               VG      Attr       LSize   Pool          Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root             rhel    -wi-ao---- <26.00g                                                             
+  swap             rhel    -wi-ao----   3.00g                                                             
+  Linux_tp_pool    vg_thin twi-aotz--  15.00g                      0.00   10.33                           
+  thin_vol_client1 vg_thin Vwi-a-tz--   5.00g Linux_tp_pool        0.00                                   
+  thin_vol_client2 vg_thin Vwi-a-tz--   5.00g Linux_tp_pool        0.00                                   
+  thin_vol_client3 vg_thin Vwi-a-tz--   5.00g Linux_tp_pool        0.00                                   
+[root@localhost ~]# 
+
+
+
+Note :- If we are going to  create another Logical Volume client4 ---> it called as  Over provisiong
+
+**************************************************************************************************************
+
+7. Formating and Mounting the Logical Volumes [ client1,2,3]
+
+
+[root@localhost ~]# mkdir -p /mnt/client1 /mnt/client2 /mnt/client3
+[root@localhost ~]# ll /mnt
+total 0
+drwxr-xr-x. 2 root root 6 May  1 10:23 client1
+drwxr-xr-x. 2 root root 6 May  1 10:23 client2
+drwxr-xr-x. 2 root root 6 May  1 10:23 client3
+drwxr-xr-x. 2 root root 6 Apr  9 17:49 hgfs
+[root@localhost ~]# 
+
+
+[root@localhost ~]# mkfs.ext4 /dev/vg_thin/thin_vol_client1 && mkfs.ext4 /dev/vg_thin/thin_vol_client2 && mkfs.ext4 /dev/vg_thin/thin_vol_client3 
+mke2fs 1.44.3 (10-July-2018)
+Discarding device blocks: done                            
+Creating filesystem with 1310720 4k blocks and 327680 inodes
+Filesystem UUID: b1c9be97-5839-4950-bf0f-94502e17c546
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+mke2fs 1.44.3 (10-July-2018)
+Discarding device blocks: done                            
+Creating filesystem with 1310720 4k blocks and 327680 inodes
+Filesystem UUID: ddbff183-40c5-4348-8604-eab11ab7df71
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+mke2fs 1.44.3 (10-July-2018)
+Discarding device blocks: done                            
+Creating filesystem with 1310720 4k blocks and 327680 inodes
+Filesystem UUID: 67897825-7406-4bd0-9f88-edba14f125a0
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# lsblk -f
+NAME                              FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                                        
+sdb                                                                                        
+└─sdb1                            LVM2_member       Kiv33C-uj4s-w7gd-PIjK-E3xe-tIaQ-azaBYn 
+  ├─vg_thin-Linux_tp_pool_tmeta                                                            
+  │ └─vg_thin-Linux_tp_pool-tpool                                                          
+  │   ├─vg_thin-Linux_tp_pool                                                              
+  │   ├─vg_thin-thin_vol_client1  ext4              b1c9be97-5839-4950-bf0f-94502e17c546   
+  │   ├─vg_thin-thin_vol_client2  ext4              ddbff183-40c5-4348-8604-eab11ab7df71   
+  │   └─vg_thin-thin_vol_client3  ext4              67897825-7406-4bd0-9f88-edba14f125a0   
+  └─vg_thin-Linux_tp_pool_tdata                                                            
+    └─vg_thin-Linux_tp_pool-tpool                                                          
+      ├─vg_thin-Linux_tp_pool                                                              
+      ├─vg_thin-thin_vol_client1  ext4              b1c9be97-5839-4950-bf0f-94502e17c546   
+      ├─vg_thin-thin_vol_client2  ext4              ddbff183-40c5-4348-8604-eab11ab7df71   
+      └─vg_thin-thin_vol_client3  ext4              67897825-7406-4bd0-9f88-edba14f125a0   
+sr0                                                                                        
+nvme0n1                                                                                    
+├─nvme0n1p1                       xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2                       LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root                     xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap                     swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# 
+
+
+
+[root@localhost ~]# mount /dev/vg_thin/thin_vol_client1 /mnt/client1/ && mount /dev/vg_thin/thin_vol_client2 /mnt/client2/ && mount /dev/vg_thin/thin_vol_client3 /mnt/client3/
+[root@localhost ~]# df -hTP
+Filesystem                           Type      Size  Used Avail Use% Mounted on
+devtmpfs                             devtmpfs  889M     0  889M   0% /dev
+tmpfs                                tmpfs     904M     0  904M   0% /dev/shm
+tmpfs                                tmpfs     904M  9.8M  894M   2% /run
+tmpfs                                tmpfs     904M     0  904M   0% /sys/fs/cgroup
+/dev/mapper/rhel-root                xfs        26G  4.0G   23G  16% /
+/dev/nvme0n1p1                       xfs      1014M  169M  846M  17% /boot
+tmpfs                                tmpfs     181M   16K  181M   1% /run/user/42
+tmpfs                                tmpfs     181M  3.5M  178M   2% /run/user/1000
+/dev/mapper/vg_thin-thin_vol_client1 ext4      4.9G   20M  4.6G   1% /mnt/client1
+/dev/mapper/vg_thin-thin_vol_client2 ext4      4.9G   20M  4.6G   1% /mnt/client2
+/dev/mapper/vg_thin-thin_vol_client3 ext4      4.9G   20M  4.6G   1% /mnt/client3
+[root@localhost ~]# 
+
+
+*************************************************************************************************************************************
+
+
+
+8. Put some data in each FS
+
+client - 1  [4GB]  ---> 82% space is using
+
+[root@localhost client1]# dd if=/dev/zero of=/mnt/client1/file.txt  bs=1024M count=4
+4+0 records in
+4+0 records out
+4294967296 bytes (4.3 GB, 4.0 GiB) copied, 13.9549 s, 308 MB/s
+[root@localhost client1]# ll
+total 4194324
+-rw-r--r--. 1 root root 4294967296 May  1 10:51 file.txt
+drwx------. 2 root root      16384 May  1 10:26 lost+found
+[root@localhost client1]#
+
+[root@localhost client1]# lvs
+  LV               VG      Attr       LSize   Pool          Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root             rhel    -wi-ao---- <26.00g                                                             
+  swap             rhel    -wi-ao----   3.00g                                                             
+  Linux_tp_pool    vg_thin twi-aotz--  15.00g                      29.54  17.30                           
+  thin_vol_client1 vg_thin Vwi-aotz--   5.00g Linux_tp_pool        82.88                                  
+  thin_vol_client2 vg_thin Vwi-aotz--   5.00g Linux_tp_pool        2.88                                   
+  thin_vol_client3 vg_thin Vwi-aotz--   5.00g Linux_tp_pool        2.88                                   
+[root@localhost client1]# 
+
+Client - 2 [2GB]  
+
+[root@localhost client1]# cd /mnt/client2/
+[root@localhost client2]# dd if=/dev/zero of=/mnt/client1/file.txt  bs=1024M count=2
+2+0 records in
+2+0 records out
+2147483648 bytes (2.1 GB, 2.0 GiB) copied, 4.70603 s, 456 MB/s
+
+Client -3 [2GB]
+
+[root@localhost client2]# cd /mnt/client3/
+[root@localhost client3]# dd if=/dev/zero of=/mnt/client1/file.txt  bs=1024M count=2
+2+0 records in
+2+0 records out
+2147483648 bytes (2.1 GB, 2.0 GiB) copied, 4.17824 s, 514 MB/s
+[root@localhost client3]# 
+
+
+******************************************************************************************************
+
+9. Creating extra LVM of 5GB Client4
+
+client1 ---> 4GB
+client2 ---> 2GB
+client3 ---> 2GB
+---------------------
+             6GB
+
+Free Space :- 9GB
+
+
+[root@localhost ~]# lvcreate -V 5G --thin -n thin_vol_client4 vg_thin/Linux_tp_pool
+  WARNING: Sum of all thin volume sizes (20.00 GiB) exceeds the size of thin pool vg_thin/Linux_tp_pool and the size of whole volume group (<19.97 GiB).
+  WARNING: You have not turned on protection against thin pools running out of space.
+  WARNING: Set activation/thin_pool_autoextend_threshold below 100 to trigger automatic extension of thin pools before they get full.
+  Logical volume "thin_vol_client4" created.
+[root@localhost ~]#
+
+
+as we got warning from above  Total LVM [20GB] Actual LVM POOL [15GB]  ---> we need to set threshold limit and monitor continously 
+
+Cons:-
+
+it will leads corruption if data reaches 100%
+
+Solution :- 
+
+we need to extend the thin LVM pool
+
+
+************************************************************************************************************
+
+10. Extending LVM POOL
+
+
+
+vg :- 5GB only we have so it's throws error for 15GB
+
+[root@localhost ~]# lvextend -L +15G /dev/vg_thin/Linux_tp_pool 
+  Insufficient free space: 480 extents needed, but only 157 available
+[root@localhost ~]# fdisk /dev/sdb
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (2-4, default 2): 
+First sector (41945088-104857599, default 41945088): 
+Last sector, +sectors or +size{K,M,G,T,P} (41945088-104857599, default 104857599): 
+
+Created a new partition 2 of type 'Linux' and of size 30 GiB.
+
+Command (m for help): t
+Partition number (1,2, default 2):   
+Hex code (type L to list all codes): 8e
+
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# pvcreate /dev/sdb2 
+  Physical volume "/dev/sdb2" successfully created.
+[root@localhost ~]# pvs
+  PV             VG      Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel    lvm2 a--  <29.00g      0 
+  /dev/sdb1      vg_thin lvm2 a--  <19.97g  <4.91g
+  /dev/sdb2              lvm2 ---  <30.00g <30.00g
+[root@localhost ~]# vgextend vg_thin /dev/sdb2 
+  Volume group "vg_thin" successfully extended
+[root@localhost ~]# lvextend -L +15G /dev/vg_thin/Linux_tp_pool 
+  Size of logical volume vg_thin/Linux_tp_pool_tdata changed from 15.00 GiB (480 extents) to 30.00 GiB (960 extents).
+  Logical volume vg_thin/Linux_tp_pool_tdata successfully resized.
+[root@localhost ~]# vgs
+  VG      #PV #LV #SN Attr   VSize   VFree  
+  rhel      1   2   0 wz--n- <29.00g      0 
+  vg_thin   2   5   0 wz--n- <49.94g <19.88g
+[root@localhost ~]#
+
+***************************************************************************************************************************
+
+
