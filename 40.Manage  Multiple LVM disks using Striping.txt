@@ -1,0 +1,510 @@
+Manage  Multiple LVM disks using Striping
+=======================================================================================
+
+LVM Striping ---> write data on Multiple disk instead of single disk 
+
+Pros :-
+> Performance Increases 
+[ One disk have read & write speed  limitation 
+  multiple disk using parallelly multiple read & write speed of disks ]
+
+Disk1 [2MB/PS]  + Disk2 [2MB/PS] + Disk3 [2MB/PS]  + Disk4 [2MB/PS] + Disk5 [2MB/PS] ---> LVM Striped DISK [10MB/PS]
+
+> Save From Hardwrite Over 
+[ due to I/O operations Disk lifespan  and performance decreases for single disk
+  multiple disks  perform I/O operations while we have so not much impact on lifespan on disk ]
+
+> Disk Fillup reduced
+
+ 
+
+Disk1
+[/dev/sda] <--70MB/PS(I/O) --> PV1
+
+                                        
+
+Disk2
+[/dev/sdb]<--70MB/PS(I/O) --> PV2  ----> PV1+PV2+PV3 ----> Volume Group <----210MB/P(I/O) ---> LVM   ---> Directory [ actually data  stored in 3 disks]
+													  (Data)
+
+
+Disk3
+[/dev/sdc]<--70MB/PS(I/O) --> PV3
+
+=====================================================================================================
+
+Practical:-
+==========================================================================================
+
+
+1. Added 5 X 1GB disks ---> 
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    1G  0 disk 
+sdb             8:16   0    1G  0 disk 
+sdc             8:32   0    1G  0 disk 
+sdd             8:48   0    1G  0 disk 
+sde             8:64   0    1G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l | grep sd
+Disk /dev/sdc: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sdb: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sdd: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sde: 1 GiB, 1073741824 bytes, 2097152 sectors
+[root@localhost ~]# 
+
+*********************************************************************************************************
+
+2. Created Partition on four disk [ sdb,sdc,sdd,sde] 
+
+[root@localhost ~]# fdisk -l | grep sd
+Disk /dev/sdc: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sdb: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sdd: 1 GiB, 1073741824 bytes, 2097152 sectors
+Disk /dev/sde: 1 GiB, 1073741824 bytes, 2097152 sectors
+[root@localhost ~]# fdisk /dev/sdb 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x91c26d85.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-2097151, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-2097151, default 2097151): 
+
+Created a new partition 1 of type 'Linux' and of size 1023 MiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# fdisk /dev/sdc
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xdf796eaa.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-2097151, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-2097151, default 2097151): 
+
+Created a new partition 1 of type 'Linux' and of size 1023 MiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# fdisk /dev/sdd
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x382b0903.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-2097151, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-2097151, default 2097151): 
+
+Created a new partition 1 of type 'Linux' and of size 1023 MiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# fdisk /dev/sde 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x70440df6.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-2097151, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-2097151, default 2097151): 
+
+Created a new partition 1 of type 'Linux' and of size 1023 MiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    1G  0 disk 
+sdb             8:16   0    1G  0 disk 
+└─sdb1          8:17   0 1023M  0 part 
+sdc             8:32   0    1G  0 disk 
+└─sdc1          8:33   0 1023M  0 part 
+sdd             8:48   0    1G  0 disk 
+└─sdd1          8:49   0 1023M  0 part 
+sde             8:64   0    1G  0 disk 
+└─sde1          8:65   0 1023M  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+*******************************************************************************************************************
+3. Converting all partitions to PV's
+[ using regular expressions -v --> verbose {shows output} ]
+
+[root@localhost ~]# pvcreate /dev/sd[b-e]1 -v
+    Wiping signatures on new PV /dev/sdb1.
+    Wiping signatures on new PV /dev/sdc1.
+    Wiping signatures on new PV /dev/sdd1.
+    Wiping signatures on new PV /dev/sde1.
+    Set up physical volume for "/dev/sdb1" with 2095104 available sectors.
+    Zeroing start of device /dev/sdb1.
+    Writing physical volume data to disk "/dev/sdb1".
+  Physical volume "/dev/sdb1" successfully created.
+    Set up physical volume for "/dev/sdc1" with 2095104 available sectors.
+    Zeroing start of device /dev/sdc1.
+    Writing physical volume data to disk "/dev/sdc1".
+  Physical volume "/dev/sdc1" successfully created.
+    Set up physical volume for "/dev/sdd1" with 2095104 available sectors.
+    Zeroing start of device /dev/sdd1.
+    Writing physical volume data to disk "/dev/sdd1".
+  Physical volume "/dev/sdd1" successfully created.
+    Set up physical volume for "/dev/sde1" with 2095104 available sectors.
+    Zeroing start of device /dev/sde1.
+    Writing physical volume data to disk "/dev/sde1".
+  Physical volume "/dev/sde1" successfully created.
+[root@localhost ~]# 
+
+
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize    PFree   
+  /dev/nvme0n1p2 rhel lvm2 a--   <29.00g       0 
+  /dev/sdb1           lvm2 ---  1023.00m 1023.00m
+  /dev/sdc1           lvm2 ---  1023.00m 1023.00m
+  /dev/sdd1           lvm2 ---  1023.00m 1023.00m
+  /dev/sde1           lvm2 ---  1023.00m 1023.00m
+[root@localhost ~]# 
+*************************************************************************************************************************
+
+4. WHile creating volume group we can specify the  Physical Extents
+
+
+root@localhost ~]# vgcreate -s 16M vg_strip /dev/sd[b-e]1 -v
+    Wiping signatures on new PV /dev/sdb1.
+    Wiping signatures on new PV /dev/sdc1.
+    Wiping signatures on new PV /dev/sdd1.
+    Wiping signatures on new PV /dev/sde1.
+    Adding physical volume '/dev/sdb1' to volume group 'vg_strip'
+    Adding physical volume '/dev/sdc1' to volume group 'vg_strip'
+    Adding physical volume '/dev/sdd1' to volume group 'vg_strip'
+    Adding physical volume '/dev/sde1' to volume group 'vg_strip'
+    Archiving volume group "vg_strip" metadata (seqno 0).
+    Creating volume group backup "/etc/lvm/backup/vg_strip" (seqno 1).
+  Volume group "vg_strip" successfully created
+[root@localhost ~]# vgs vg_strip 
+  VG       #PV #LV #SN Attr   VSize  VFree 
+  vg_strip   4   0   0 wz--n- <3.94g <3.94g
+[root@localhost ~]# vgdisplay | grep PE
+  PE Size               16.00 MiB
+  Total PE              252
+  Alloc PE / Size       0 / 0   
+  Free  PE / Size       252 / <3.94 GiB
+  PE Size               4.00 MiB
+  Total PE              7423
+  Alloc PE / Size       7423 / <29.00 GiB
+  Free  PE / Size       0 / 0   
+[root@localhost ~]# 
+
+****************************************************************************************************************************************
+
+5. Define Logical Volume with  4 striping
+
+[ -i[n] ---> replace n with number of stripes of disk ]
+
+
+[root@localhost ~]# lvcreate -L 900M -n rhel_strip1 -i4 vg_strip 
+  Using default stripesize 64.00 KiB.
+  Rounding up size to full physical extent 912.00 MiB
+  Rounding size 912.00 MiB (57 extents) up to stripe boundary size 960.00 MiB(60 extents).
+  Logical volume "rhel_strip1" created.
+[root@localhost ~]# lvs
+  LV          VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root        rhel     -wi-ao---- <26.00g                                                    
+  swap        rhel     -wi-ao----   3.00g                                                    
+  rhel_strip1 vg_strip -wi-a----- 960.00m                                                    
+[root@localhost ~]# 
+
+
+root@localhost ~]# lvdisplay /dev/vg_strip/rhel_strip1 
+  --- Logical volume ---
+  LV Path                /dev/vg_strip/rhel_strip1
+  LV Name                rhel_strip1
+  VG Name                vg_strip
+  LV UUID                rF8cMR-TnT8-QZYQ-wKEE-PHPS-dHuf-Ak1bda
+  LV Write Access        read/write
+  LV Creation host, time localhost.localdomain, 2024-05-01 19:44:20 -0400
+  LV Status              available
+  # open                 0
+  LV Size                960.00 MiB
+  Current LE             60
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:2
+   
+[root@localhost ~]# 
+**********************************************************************************************
+
+6.  to get the logical volume stripe details [-m]
+
+[ 1 stripe ---> 64Kbps
+  we can also change the Value ]
+
+[root@localhost ~]# lvdisplay /dev/vg_strip/rhel_strip1  -m
+  --- Logical volume ---
+  LV Path                /dev/vg_strip/rhel_strip1
+  LV Name                rhel_strip1
+  VG Name                vg_strip
+  LV UUID                rF8cMR-TnT8-QZYQ-wKEE-PHPS-dHuf-Ak1bda
+  LV Write Access        read/write
+  LV Creation host, time localhost.localdomain, 2024-05-01 19:44:20 -0400
+  LV Status              available
+  # open                 0
+  LV Size                960.00 MiB
+  Current LE             60
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:2
+   
+  --- Segments ---
+  Logical extents 0 to 59:
+    Type		striped
+    Stripes		4
+    Stripe size		64.00 KiB
+    Stripe 0:
+      Physical volume	/dev/sdb1
+      Physical extents	0 to 14
+    Stripe 1:
+      Physical volume	/dev/sdc1
+      Physical extents	0 to 14
+    Stripe 2:
+      Physical volume	/dev/sdd1
+      Physical extents	0 to 14
+    Stripe 3:
+      Physical volume	/dev/sde1
+      Physical extents	0 to 14
+   
+   
+[root@localhost ~]#
+
+**************************************************************************************
+7. 1. modifying striping size -->64kbps to 256kbps 
+   2. mentioning particluar disks needs to occupie lv for striping [sdb1,sdc1,sdd1]
+
+
+[root@localhost ~]# lvcreate -L 1G -i3 -I 256 -n rhel_strip2  vg_strip /dev/sdb1 /dev/sdc1 /dev/sdd1 
+  Rounding size 1.00 GiB (64 extents) up to stripe boundary size 1.03 GiB(66 extents).
+  Logical volume "rhel_strip2" created.
+[root@localhost ~]# lvs
+  LV          VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root        rhel     -wi-ao---- <26.00g                                                    
+  swap        rhel     -wi-ao----   3.00g                                                    
+  rhel_strip1 vg_strip -wi-a----- 960.00m                                                    
+  rhel_strip2 vg_strip -wi-a-----   1.03g                                                    
+[root@localhost ~]# 
+
+
+[root@localhost ~]# lvdisplay /dev/vg_strip/rhel_strip2  -m
+  --- Logical volume ---
+  LV Path                /dev/vg_strip/rhel_strip2
+  LV Name                rhel_strip2
+  VG Name                vg_strip
+  LV UUID                wmpxse-8GeE-ihqi-Z7sF-2POs-YWMl-mKGx47
+  LV Write Access        read/write
+  LV Creation host, time localhost.localdomain, 2024-05-01 19:51:03 -0400
+  LV Status              available
+  # open                 0
+  LV Size                1.03 GiB
+  Current LE             66
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:3
+   
+  --- Segments ---
+  Logical extents 0 to 65:
+    Type		striped
+    Stripes		3
+    Stripe size		256.00 KiB
+    Stripe 0:
+      Physical volume	/dev/sdb1
+      Physical extents	15 to 36
+    Stripe 1:
+      Physical volume	/dev/sdc1
+      Physical extents	15 to 36
+    Stripe 2:
+      Physical volume	/dev/sdd1
+      Physical extents	15 to 36
+   
+   
+[root@localhost ~]# 
+
+
+[root@localhost ~]# lsblk
+NAME                     MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                        8:0    0    1G  0 disk 
+sdb                        8:16   0    1G  0 disk 
+└─sdb1                     8:17   0 1023M  0 part 
+  ├─vg_strip-rhel_strip1 253:2    0  960M  0 lvm  
+  └─vg_strip-rhel_strip2 253:3    0    1G  0 lvm  
+sdc                        8:32   0    1G  0 disk 
+└─sdc1                     8:33   0 1023M  0 part 
+  ├─vg_strip-rhel_strip1 253:2    0  960M  0 lvm  
+  └─vg_strip-rhel_strip2 253:3    0    1G  0 lvm  
+sdd                        8:48   0    1G  0 disk 
+└─sdd1                     8:49   0 1023M  0 part 
+  ├─vg_strip-rhel_strip1 253:2    0  960M  0 lvm  
+  └─vg_strip-rhel_strip2 253:3    0    1G  0 lvm  
+sde                        8:64   0    1G  0 disk 
+└─sde1                     8:65   0 1023M  0 part 
+  └─vg_strip-rhel_strip1 253:2    0  960M  0 lvm  
+sr0                       11:0    1 1024M  0 rom  
+nvme0n1                  259:0    0   30G  0 disk 
+├─nvme0n1p1              259:1    0    1G  0 part /boot
+└─nvme0n1p2              259:2    0   29G  0 part 
+  ├─rhel-root            253:0    0   26G  0 lvm  /
+  └─rhel-swap            253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]#
+
+
+
+rhel_stripe1 ---> 4 stripes
+
+ --- Segments ---
+  Logical extents 0 to 59:
+    Type		striped
+    Stripes		4
+    Stripe size		64.00 KiB
+    Stripe 0:
+      Physical volume	/dev/sdb1
+      Physical extents	0 to 14
+    Stripe 1:
+      Physical volume	/dev/sdc1
+      Physical extents	0 to 14
+    Stripe 2:
+      Physical volume	/dev/sdd1
+      Physical extents	0 to 14
+    Stripe 3:
+      Physical volume	/dev/sde1
+      Physical extents	0 to 14
+
+rhel_stripe2 ----> 3 stripes
+
+  --- Segments ---
+  Logical extents 0 to 65:
+    Type		striped
+    Stripes		3
+    Stripe size		256.00 KiB
+    Stripe 0:
+      Physical volume	/dev/sdb1
+      Physical extents	15 to 36
+    Stripe 1:
+      Physical volume	/dev/sdc1
+      Physical extents	15 to 36
+    Stripe 2:
+      Physical volume	/dev/sdd1
+      Physical extents	15 to 36
+
+***********************************************************************************************
+
+8. need to know dependencies of  and get the stripe disks
+
+
+[root@localhost ~]# dmsetup deps /dev/vg_strip/rhel_strip[1-2]
+/dev/vg_strip/rhel_strip1: 4 dependencies	: (8, 65) (8, 49) (8, 33) (8, 17)
+/dev/vg_strip/rhel_strip2: 3 dependencies	: (8, 49) (8, 33) (8, 17)
+[root@localhost ~]# 
+
+
+[ Those numbers will represent the disk details in lsblk output [MAJ:MIN] ]
+***************************************************************************************************
+
+=======================================================================================================
+
