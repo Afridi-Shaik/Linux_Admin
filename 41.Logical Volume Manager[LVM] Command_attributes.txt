@@ -1,0 +1,717 @@
+Logical Volume Manager[LVM] Commands & Attributes
+
+
+
+
+[root@localhost ~]# cd /etc/lvm
+[root@localhost lvm]# ll
+total 108
+drwx------. 2 root root  4096 May  1 19:51 archive
+drwx------. 2 root root   131 May  1 19:51 backup
+drwx------. 2 root root     6 Feb 22  2019 cache
+-rw-r--r--. 1 root root 97715 Apr 21 17:04 lvm.conf
+-rw-r--r--. 1 root root  2301 Feb 22  2019 lvmlocal.conf
+drwxr-xr-x. 2 root root   245 Apr  9 17:48 profile
+[root@localhost lvm]#
+
+
+backup ---> automatic backup of LVM  ----> LVM changes are stored here
+
+
+[root@localhost backup]# ll
+total 40
+-rw-------. 1 root root 1340 Apr 27 13:13 dataVG
+-rw-------. 1 root root  910 Apr 21 18:45 Linux_VG
+-rw-------. 1 root root 1734 Apr  9 18:07 rhel
+-rw-------. 1 root root 1332 Apr 21 20:29 VG_1
+-rw-------. 1 root root 1338 Apr 21 20:29 VG_2
+-rw-------. 1 root root 2641 May  1 19:51 vg_strip
+-rw-------. 1 root root 5002 May  1 11:29 vg_thin
+-rw-------. 1 root root 1353 May  1 05:38 VolGrp
+-rw-------. 1 root root 1351 Apr 17 18:52 XFS_VG
+
+
+cache ----> persistent filter ----> no files because it's used to store cache
+
+
+[root@localhost backup]# cd ../cache/
+[root@localhost cache]# ll
+total 0
+[root@localhost cache]# ls -la
+total 0
+drwx------. 2 root root   6 Feb 22  2019 .
+drwxr-xr-x. 6 root root 100 Apr 21 17:04 ..
+[root@localhost cache]# 
+
+
+archive ----> vg extension and automatic archives or changes in VG will be stored here[ we can recover deleted LVM]
+
+[root@localhost lvm]# cd archive/
+[root@localhost archive]# ll
+total 352
+-rw-------. 1 root root  903 Apr 27 12:38 dataVG_00000-903969768.vg
+-rw-------. 1 root root  911 Apr 27 12:39 dataVG_00001-1605945054.vg
+-rw-------. 1 root root 1341 Apr 27 12:51 dataVG_00002-430904957.vg
+-rw-------. 1 root root 1594 Apr 27 12:59 dataVG_00003-326061988.vg
+-rw-------. 1 root root 2101 Apr 27 13:13 dataVG_00004-309476518.vg
+-rw-------. 1 root root 1561 Apr 27 13:13 dataVG_00005-2095914038.vg
+-rw-------. 1 root root 1583 Apr 27 13:13 dataVG_00006-1523916368.vg
+
+[root@localhost archive]# vgcfgrestore --list rhel
+   
+  File:		/etc/lvm/archive/rhel_00000-1832807317.vg
+  Couldn't find device with uuid dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB.
+  VG name:    	rhel
+  Description:	Created *before* executing 'pvscan --cache --activate ay 259:2'
+  Backup Time:	Tue Apr  9 18:07:46 2024
+
+   
+  File:		/etc/lvm/backup/rhel
+  VG name:    	rhel
+  Description:	Created *after* executing 'pvscan --cache --activate ay 259:2'
+  Backup Time:	Tue Apr  9 18:07:46 2024
+
+[root@localhost archive]#
+
+
+
+lvm.conf ----> LVM configuration we can make changes in this configuration file
+
+profile ----> lvms profiles files also stored here
+
+[root@localhost lvm]# cd profile/
+[root@localhost profile]# ll
+total 32
+-r--r--r--. 1 root root  531 Dec 18  2018 cache-mq.profile
+-r--r--r--. 1 root root  339 Dec 18  2018 cache-smq.profile
+-r--r--r--. 1 root root 3020 Feb 22  2019 command_profile_template.profile
+-r--r--r--. 1 root root 2309 Dec 18  2018 lvmdbusd.profile
+-r--r--r--. 1 root root  828 Feb 22  2019 metadata_profile_template.profile
+-r--r--r--. 1 root root   76 Dec 18  2018 thin-generic.profile
+-r--r--r--. 1 root root   80 Dec 18  2018 thin-performance.profile
+-r--r--r--. 1 root root  563 Feb 22  2019 vdo-small.profile
+[root@localhost profile]# 
+
+
+/var/lock/lvm ----> used to prevent metadata corruption of LVM
+
+[root@localhost profile]# cd /var/lock/lvm/
+[root@localhost lvm]# ll
+total 0
+[root@localhost lvm]# 
+
+
+
+lvmdump used to  digagonstic purpose it will create tgz file
+
+> lvmdump -d [path]
+
+[root@localhost ~]# lvmdump 
+Creating dump directory: /root/lvmdump-localhost.localdomain-2024050382728
+Gathering LVM & device-mapper version info...
+Gathering dmsetup info...
+Gathering process info...
+Gathering console messages...
+Gathering /etc/lvm info...
+Gathering /dev listing...
+Gathering /sys/block listing...
+Creating report tarball in /root/lvmdump-localhost.localdomain-2024050382728.tgz...
+[root@localhost ~]# 
+
+***************************************************************************************************
+
+-v Option to list more information
+-a  shows pv disk and non pvdisk information
+
+
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0 
+[root@localhost ~]# pvs -v
+  PV             VG   Fmt  Attr PSize   PFree DevSize PV UUID                               
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0  <29.00g dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB
+[root@localhost ~]# 
+
+[root@localhost ~]# pvs -a
+  PV             VG   Fmt  Attr PSize   PFree
+  /dev/nvme0n1             ---       0     0 
+  /dev/nvme0n1p1           ---       0     0 
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0 
+[root@localhost ~]# 
+***************************************************************************************************
+
+pvs  two attributes
+
+a ----> allocatble /active
+x ---> exported
+u ---> unusable
+
+[root@localhost ~]# pvs --segments 
+  PV             VG   Fmt  Attr PSize   PFree Start SSize
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0      0   768
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0    768  6655
+[root@localhost ~]# 
+
+[root@localhost ~]# pvscan -v
+  PV /dev/nvme0n1p2   VG rhel            lvm2 [<29.00 GiB / 0    free]
+  Total: 1 [<29.00 GiB] / in use: 1 [<29.00 GiB] / in no VG: 0 [0   ]
+[root@localhost ~]# 
+
+*********************************************************************************************************
+
+partition is created 
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sdb             8:16   0   10G  0 disk 
+└─sdb1          8:17   0   10G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0 
+[root@localhost ~]# pvcreate /dev/sdb1 
+  Physical volume "/dev/sdb1" successfully created.
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g      0 
+  /dev/sdb1           lvm2 ---  <10.00g <10.00g
+
+pvs -a 
+
+[root@localhost ~]# pvs -a
+  PV             VG   Fmt  Attr PSize   PFree  
+  /dev/nvme0n1             ---       0       0 
+  /dev/nvme0n1p1           ---       0       0 
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g      0 
+  /dev/sda                 ---       0       0 
+  /dev/sdb1           lvm2 ---  <10.00g <10.00g
+
+pvs -v  ---> shows UUID of the lvm
+
+[root@localhost ~]# pvs -v
+  PV             VG   Fmt  Attr PSize   PFree   DevSize PV UUID                               
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g      0  <29.00g dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB
+  /dev/sdb1           lvm2 ---  <10.00g <10.00g <10.00g J1YLFf-AadQ-oNm0-0Oro-krRs-PFJu-iY5nnN
+
+pvremove --->removing teh pv 
+
+[root@localhost ~]# pvremove /dev/sdb1 
+  Labels on physical volume "/dev/sdb1" successfully wiped.
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g    0 
+[root@localhost ~]# 
+
+
+change attributes ---> pvchange  ---> physical volume attributes change
+
+
+pvck ----> to check physical volume check consisitency
+
+[root@localhost ~]# pvck -v /dev/sdb1 
+  Could not find LVM label on /dev/sdb1
+[root@localhost ~]# 
+
+
+[root@localhost ~]# pvcreate /dev/sdb1 
+  Physical volume "/dev/sdb1" successfully created.
+[root@localhost ~]# pvck -v /dev/sdb1 
+  Found label on /dev/sdb1, sector 1, type=LVM2 001
+  Found text metadata area: offset=4096, size=1044480
+[root@localhost ~]# 
+
+*************************************************************************************************************\
+
+physical volume move 
+
+pvmove -n [move_disk_path] [dest_disk_path]
+
+Example:-
+sdb1 data will be moved to sdc1
+
+pvmove -n /dev/sdb1 /dev/sdc1
+
+************************************************************************************************************
+============================================================================================
+Volume groups
+==================================================================================================
+
+-v ---> for more information
+
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree
+  rhel   1   2   0 wz--n- <29.00g    0 
+[root@localhost ~]# vgs -v
+  VG   Attr   Ext   #PV #LV #SN VSize   VFree VG UUID                                VProfile
+  rhel wz--n- 4.00m   1   2   0 <29.00g    0  0i6Mpy-qlmS-oNmB-fz0M-RkoP-92R9-AvHFgT         
+[root@localhost ~]# vgdisplay -v
+  --- Volume group ---
+  VG Name               rhel
+  System ID             
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  3
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                2
+  Open LV               2
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               <29.00 GiB
+  PE Size               4.00 MiB
+  Total PE              7423
+  Alloc PE / Size       7423 / <29.00 GiB
+  Free  PE / Size       0 / 0   
+  VG UUID               0i6Mpy-qlmS-oNmB-fz0M-RkoP-92R9-AvHFgT
+   
+*******************************************************************************************************************
+show disk information 
+
+[root@localhost ~]# vgs -a -o +devices
+  VG   #PV #LV #SN Attr   VSize   VFree Devices            
+  rhel   1   2   0 wz--n- <29.00g    0  /dev/nvme0n1p2(0)  
+  rhel   1   2   0 wz--n- <29.00g    0  /dev/nvme0n1p2(768)
+[root@localhost ~]# 
+
+**********************************************************************************************************************
+
+vgcreate ----> create volume group
+
+-s ----> particular PE extents
+
+vgextend ----> extend volume group
+
+vgreduce ----> reduce volume group
+
+vgck    ---> check volume group
+
+-v ---> moreinfo
+
+vgchange  ---> 
+
+vgchange -ay 
+
+y ----> activate
+n ----> Deactivate
+
+
+[root@localhost ~]# lvscan 
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+[root@localhost ~]#
+
+vgrename ----> rename volume group
+
+[root@localhost ~]# vgs
+  VG    #PV #LV #SN Attr   VSize   VFree  
+  newvg   1   0   0 wz--n- <10.00g <10.00g
+  rhel    1   2   0 wz--n- <29.00g      0 
+[root@localhost ~]# vgrename newvg  oldvg
+  Volume group "newvg" successfully renamed to "oldvg"
+[root@localhost ~]# vgs
+  VG    #PV #LV #SN Attr   VSize   VFree  
+  oldvg   1   0   0 wz--n- <10.00g <10.00g
+  rhel    1   2   0 wz--n- <29.00g      0 
+[root@localhost ~]# 
+
+
+vgmerge ----> merge two volume groups 
+
+vgsplit ----> split volume group  into two or more
+
+vgexport --->  to move vg from machine to another machine
+
+vgimport ---> import the vg which has been exported after attaching disks of particular vg
+
+vgcfgbackup  ---> take manual backup of vg 
+
+
+[root@localhost ~]# vgcfgbackup -f /tmp/old.vg oldvg
+  Volume group "oldvg" successfully backed up.
+[root@localhost ~]# ll /tmp/old.vg 
+-rw-------. 1 root root 880 May  3 04:57 /tmp/old.vg
+[root@localhost ~]# 
+
+
+vgimportclone ----> clone vg
+
+
+[root@localhost ~]# vgimportclone /dev/sdb1 
+[root@localhost ~]# vgs
+  VG     #PV #LV #SN Attr   VSize   VFree  
+  oldvg1   1   0   0 wz--n- <10.00g <10.00g
+  rhel     1   2   0 wz--n- <29.00g      0 
+[root@localhost ~]# 
+
+=============================================================================================
+
+Logical Volume
+=========================================================================================
+
+
+lvs -v
+
+lvdisplay -v 
+
+
+lvdisplay --maps    -----> to check mirror volumes and segments
+
+  --- Logical volume ---
+  LV Path                /dev/rhel/root
+  LV Name                root
+  VG Name                rhel
+  LV UUID                PoekwG-hRem-k6eK-lCj0-se1j-rWRX-t4TuIE
+  LV Write Access        read/write
+  LV Creation host, time localhost, 2024-04-09 17:45:45 -0400
+  LV Status              available
+  # open                 1
+  LV Size                <26.00 GiB
+  Current LE             6655
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:0
+   
+  --- Segments ---
+  Logical extents 0 to 6654:
+    Type		linear
+    Physical volume	/dev/nvme0n1p2
+    Physical extents	768 to 7422
+[root@localhost ~]# 
+
+
+*************************************************************************************
+
+disk details of lv
+
+[root@localhost ~]# lvs -a -o +devices
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert Devices            
+  root rhel -wi-ao---- <26.00g                                                     /dev/nvme0n1p2(768)
+  swap rhel -wi-ao----   3.00g                                                     /dev/nvme0n1p2(0)  
+[root@localhost ~]# 
+
+**************************************************************************************
+
+lvscan -v  ---> shows theinformation of lv
+
+
+[root@localhost ~]# lvscan
+  ACTIVE            '/dev/rhel/swap' [3.00 GiB] inherit
+  ACTIVE            '/dev/rhel/root' [<26.00 GiB] inherit
+[root@localhost ~]#
+**************************************************************************************************************
+
+lvcreate  ---> create logical volume
+lvremove  ---> Delete Logical volume
+lvextend  ---> Extend Logical volume
+lvreduce  ---> reduce logical volume
+
+
+lvconvert ----> changes in attributes and other change
+
+****************************************************************************************************
+Rename Logical Volume
+
+[root@localhost ~]# vgs
+  VG     #PV #LV #SN Attr   VSize   VFree  
+  oldvg1   1   0   0 wz--n- <10.00g <10.00g
+  rhel     1   2   0 wz--n- <29.00g      0 
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvcreate -L 3G -n oldlv oldvg1
+  Logical volume "oldlv" created.
+[root@localhost ~]# lvs
+  LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  oldlv oldvg1 -wi-a-----   3.00g                                                    
+  root  rhel   -wi-ao---- <26.00g                                                    
+  swap  rhel   -wi-ao----   3.00g                                                    
+[root@localhost ~]# lvrename /dev/oldvg1/oldlv /dev/oldvg1/newlv
+  Renamed "oldlv" to "newlv" in volume group "oldvg1"
+[root@localhost ~]# lvs
+  LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  newlv oldvg1 -wi-a-----   3.00g                                                    
+  root  rhel   -wi-ao---- <26.00g                                                    
+  swap  rhel   -wi-ao----   3.00g                                                    
+[root@localhost ~]#
+****************************************************************************************************************
+
+
+LVM Snapshot ---> -s option
+*********************************************************************************************************
+
+Repair Failed mirror disk
+
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sdb             8:16   0   10G  0 disk 
+├─sdb1          8:17   0    2G  0 part 
+└─sdb2          8:18   0    8G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]#
+
+
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+sdb             8:16   0   10G  0 disk 
+├─sdb1          8:17   0    2G  0 part 
+└─sdb2          8:18   0    8G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# pvcreate /dev/sdb[1-2]
+  Physical volume "/dev/sdb1" successfully created.
+  Physical volume "/dev/sdb2" successfully created.
+[root@localhost ~]# vgcreate newvg /dev/sdb1 /dev/sdb2 
+  Volume group "newvg" successfully created
+[root@localhost ~]# pvs
+  PV             VG    Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g     0 
+  /dev/sdb1      newvg lvm2 a--   <2.00g <2.00g
+  /dev/sdb2      newvg lvm2 a--   <8.00g <8.00g
+[root@localhost ~]# vgss
+bash: vgss: command not found...
+Similar command is: 'vgs'
+[root@localhost ~]# vgs
+  VG    #PV #LV #SN Attr   VSize   VFree
+  newvg   2   0   0 wz--n-   9.99g 9.99g
+  rhel    1   2   0 wz--n- <29.00g    0 
+[root@localhost ~]# lvcreate -L 2G -n newlv newvg
+  Logical volume "newlv" created.
+[root@localhost ~]# lvs
+  LV    VG    Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  newlv newvg -wi-a-----   2.00g                                                    
+  root  rhel  -wi-ao---- <26.00g                                                    
+  swap  rhel  -wi-ao----   3.00g                                                    
+[root@localhost ~]# lsblk
+NAME            MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda               8:0    0   10G  0 disk 
+sdb               8:16   0   10G  0 disk 
+├─sdb1            8:17   0    2G  0 part 
+└─sdb2            8:18   0    8G  0 part 
+  └─newvg-newlv 253:2    0    2G  0 lvm  
+sr0              11:0    1 1024M  0 rom  
+nvme0n1         259:0    0   30G  0 disk 
+├─nvme0n1p1     259:1    0    1G  0 part /boot
+└─nvme0n1p2     259:2    0   29G  0 part 
+  ├─rhel-root   253:0    0   26G  0 lvm  /
+  └─rhel-swap   253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+
+
+
+Failing the sdb2 disk
+
+[root@localhost ~]# dd if=/dev/zero of=/dev/sdb2 count=10
+10+0 records in
+10+0 records out
+5120 bytes (5.1 kB, 5.0 KiB) copied, 0.000139481 s, 36.7 MB/s
+[root@localhost ~]# 
+
+[root@localhost ~]# dd if=/dev/zero of=/dev/sdb2 count=10
+10+0 records in
+10+0 records out
+5120 bytes (5.1 kB, 5.0 KiB) copied, 0.000139481 s, 36.7 MB/s
+[root@localhost ~]# lvs -a -o +devices
+  Couldn't find device with uuid vndna4-DO4u-91gt-ikQb-kAa3-3Fnr-Gm50GZ.
+  WARNING: Couldn't find all devices for LV newvg/newlv while checking used and assumed devices.
+  LV    VG    Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert Devices            
+  newlv newvg -wi-a---p-   2.00g                                                     [unknown](0)       
+  root  rhel  -wi-ao---- <26.00g                                                     /dev/nvme0n1p2(768)
+  swap  rhel  -wi-ao----   3.00g                                                     /dev/nvme0n1p2(0)  
+[root@localhost ~]# vgs
+  Couldn't find device with uuid vndna4-DO4u-91gt-ikQb-kAa3-3Fnr-Gm50GZ.
+  WARNING: Couldn't find all devices for LV newvg/newlv while checking used and assumed devices.
+  VG    #PV #LV #SN Attr   VSize   VFree
+  newvg   2   1   0 wz-pn-   9.99g 7.99g
+  rhel    1   2   0 wz--n- <29.00g    0 
+[root@localhost ~]#
+
+Solution:- 
+Remove the failure disk forcefully
+
+
+[root@localhost ~]# vgreduce  --removemissing --force newvg
+  Couldn't find device with uuid vndna4-DO4u-91gt-ikQb-kAa3-3Fnr-Gm50GZ.
+  WARNING: Couldn't find all devices for LV newvg/newlv while checking used and assumed devices.
+  WARNING: Removing partial LV newvg/newlv.
+  Logical volume "newlv" successfully removed
+  Wrote out consistent volume group newvg.
+[root@localhost ~]# vgs
+  VG    #PV #LV #SN Attr   VSize   VFree 
+  newvg   1   0   0 wz--n-  <2.00g <2.00g
+  rhel    1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# 
+
+***********************************************************************************************************************************************************************
+
+
+Attributes :-
+
+physical volume --->
+***************************************************************************************************************
+[root@localhost ~]# pvs
+  PV             VG    Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0 
+  /dev/sda1      newvg lvm2 a--  <10.00g <10.00g
+  /dev/sdb1      newvg lvm2 a--   <2.00g  <2.00g
+[root@localhost ~]# 
+
+change attributes
+
+[root@localhost ~]# pvchange -x n /dev/sdb1 
+  Physical volume "/dev/sdb1" changed
+  1 physical volume changed / 0 physical volumes not changed
+[root@localhost ~]# pvs
+  PV             VG    Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0 
+  /dev/sda1      newvg lvm2 a--  <10.00g <10.00g
+  /dev/sdb1      newvg lvm2 u--   <2.00g  <2.00g
+[root@localhost ~]#
+
+a ---> allocated 
+u ---> unallocatable [ un usable ]
+
+[root@localhost ~]# pvs
+  PV             VG    Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0 
+  /dev/sda1      newvg lvm2 a--  <10.00g <10.00g
+  /dev/sdb1      newvg lvm2 u--   <2.00g  <2.00g
+[root@localhost ~]# pvchange -x y /dev/sdb1 
+  Physical volume "/dev/sdb1" changed
+  1 physical volume changed / 0 physical volumes not changed
+[root@localhost ~]# pvs
+  PV             VG    Fmt  Attr PSize   PFree  
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0 
+  /dev/sda1      newvg lvm2 a--  <10.00g <10.00g
+  /dev/sdb1      newvg lvm2 a--   <2.00g  <2.00g
+[root@localhost ~]# 
+
+
+disk segements
+[root@localhost ~]# pvs --segments 
+  PV             VG    Fmt  Attr PSize   PFree   Start SSize
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0      0   768
+  /dev/nvme0n1p2 rhel  lvm2 a--  <29.00g      0    768  6655
+  /dev/sda1      newvg lvm2 a--  <10.00g <10.00g     0  2559
+  /dev/sdb1      newvg lvm2 a--   <2.00g  <2.00g     0   511
+[root@localhost ~]# 
+
+***************************************************************************************
+
+Volume Group Attributes
+
+r---> read
+w---> write
+z---> resiziable
+x---> exported
+p---> partial
+
+Allocation policies
+c--> contiguious
+n--> normal
+a--> anywhere
+i--> inheritade
+
+c --> cluster
+
+
+
+[root@localhost ~]# vgs
+  VG    #PV #LV #SN Attr   VSize   VFree 
+  newvg   2   0   0 wz--n-  11.99g 11.99g
+  rhel    1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]#
+
+
+[root@localhost ~]# vgcreate  -l 512 -p 256 -s  32M -Ay newvg /dev/sdb1
+  Physical volume "/dev/sdb1" successfully created.
+  Volume group "newvg" successfully created
+[root@localhost ~]# 
+
+ --- Volume group ---
+  VG Name               newvg
+  System ID             
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                512
+  Cur LV                0
+  Open LV               0
+  Max PV                256
+  Cur PV                1
+  Act PV                1
+  VG Size               <1.97 GiB
+  PE Size               32.00 MiB
+  Total PE              63
+  Alloc PE / Size       0 / 0   
+  Free  PE / Size       63 / <1.97 GiB
+  VG UUID               zOBw8I-U349-4XPU-cn36-Io39-iYVv-8Ld4Qr
+
+   
+******************************************************************************************************************************
+
+Logical Volume Options
+
+m ---> Mirrored LVM
+M ---> Mirrored Without inital sync
+o ---> origin
+p ---> pvmore
+s ---> snapshot
+S ---> INvalid snapshot
+v ---> virtual
+i ---> mirror Image
+l ---> Mirror Image without sync
+c ---> under construction
+- ---> simplevolume
+
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+[root@localhost ~]# 
+
+
+second field [w -->write, r -->read ]
+Third field 
+c--> contiguos,I --> cling,n --> normal ,a ---> anywhere,I ---> inherited
+Fourth Field
+m  ---> minor
+Fifth Field
+a--> active, s --> suspended, I --> invalid snapshot , S ---> invalid suspended snapshot , I ---> Mapped device present with inactive table , d ---> Mapped device present without table
+
+Sixth Field
+o---> open volume is in active state  may be mounted
+
+
