@@ -1,0 +1,489 @@
+SWAP Space 
+-----------------------------------------------
+
+Machine requires more RAM 
+
+> Unzipping high compressed files
+> Process can occupy
+
+------------------------------------------------------------------------------------
+System required 20G ram but physical RAM exist 8GB. System use Virtual Memory Concept[SWAP] to use Hard disk as RAM
+---------------------------------------------------------------------------
+SWAP enhances the System Performance
+
+>database , critical jobs running apps occupy more RAM
+
+Speed:-
+RAM>>>>>>>>>>>SWAP
+
+SWAP Code :- 82 
+
+
+===================================================
+Swap uses  paging concept 
+
+data in ---> pages form ---> FIFO [first in first out ]
+RAM --> utilization increase due to processes ---> system move ram to swap in pages form ---> until processing is completed it will reduce.
+
+===============================================================================================================
+
+
+SWAP Memory Creation on disk  partition:-
+> No downtime 
+
+=================================================x=====================================================
+1.attached 5GB scsi lun disk
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+
+
+************************************************************************************************************
+2. creating partition and changing type to swap
+
+
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x04bfbc1a.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+└─sda1                                                                 
+sr0                                                                    
+nvme0n1                                                                
+├─nvme0n1p1   xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2   LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+
+******************************************************************************************
+
+3. creating swap partition of /dev/sda1 disk
+
+[root@localhost ~]# mkswap /dev/sda1 
+Setting up swapspace version 1, size = 5 GiB (5367656448 bytes)
+no label, UUID=f8cde08f-df24-49fc-b184-89b6140b0be2
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+└─sda1        swap              f8cde08f-df24-49fc-b184-89b6140b0be2   
+sr0                                                                    
+nvme0n1                                                                
+├─nvme0n1p1   xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2   LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# free -h
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.3Gi        83Mi       9.0Mi       433Mi       346Mi
+Swap:         3.0Gi        14Mi       3.0Gi
+[root@localhost ~]# cat /proc/swaps 
+Filename				Type		Size	Used	Priority
+/dev/dm-1                               partition	3145724	14848	-2
+***************************************************************************************
+
+4. Still swap partition is not activated to activate use below swapon command
+
+[root@localhost ~]# swapon /dev/sda1 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part [SWAP]
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# free -m
+              total        used        free      shared  buff/cache   available
+Mem:           1806        1268         104           9         432         367
+Swap:          8190          14        8176
+[root@localhost ~]# free -h
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.2Gi       104Mi       9.0Mi       432Mi       367Mi
+Swap:         8.0Gi        14Mi       8.0Gi
+[root@localhost ~]# cat /proc/swaps 
+Filename				Type		Size	Used	Priority
+/dev/dm-1                               partition	3145724	14848	-2
+/dev/sda1                               partition	5241852	0	-3
+[root@localhost ~]# 
+
+******************************************************************************************************
+
+5. For Permanenet activate swap mention in /etc/fstab file
+
+
+[root@localhost ~]# cat /etc/fstab | grep swap
+/dev/mapper/rhel-swap   swap                    swap    defaults        0 0
+f8cde08f-df24-49fc-b184-89b6140b0be2            swap    defaults        0 0
+[root@localhost ~]# blkid /dev/sda1 
+/dev/sda1: UUID="f8cde08f-df24-49fc-b184-89b6140b0be2" TYPE="swap" PARTUUID="04bfbc1a-01"
+[root@localhost ~]# 
+
+**********************************************************************************************************************************
+
+======================================================================================================================================
+SWAP on Logical Volume
+> NO downtime
+===================================================================================================================
+
+1. attached 5GB disk to the server
+**************************************************************************************
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk -l /dev/sda 
+Disk /dev/sda: 5 GiB, 5368709120 bytes, 10485760 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+*********************************************************************************
+2.  creating primary paritition on sda disk
+
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xcd4faffe.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 82\
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+***************************************************************************************
+2. Creating PV
+
+[root@localhost ~]# pvcreate /dev/sda1 
+  Physical volume "/dev/sda1" successfully created.
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree 
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g     0 
+  /dev/sda1           lvm2 ---   <5.00g <5.00g
+******************************************************************************************
+3. Creating Volume Group
+
+[root@localhost ~]# vgcreate vg /dev/sda1 
+  Volume group "vg" successfully created
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  rhel   1   2   0 wz--n- <29.00g     0 
+  vg     1   0   0 wz--n-  <5.00g <5.00g
+******************************************************************************************
+4. Creating new Logical Volume
+
+[root@localhost ~]# lvcreate -L 5000M -n swap2 vg
+  Logical volume "swap2" created.
+
+[root@localhost ~]# lvs
+  LV    VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root  rhel -wi-ao---- <26.00g                                                    
+  swap  rhel -wi-ao----   3.00g                                                    
+  swap2 vg   -wi-a-----   4.88g  
+***********************************************************************************************
+5.Making Swap partition
+                                                  
+[root@localhost ~]# mkswap /dev/vg/swap2 
+Setting up swapspace version 1, size = 4.9 GiB (5242875904 bytes)
+no label, UUID=2412155d-a13c-45c1-bb33-921e2ff0d7c9
+
+********************************************************************************************
+6. Turing on swap partition
+
+[root@localhost ~]# swapon /dev/vg/swap2
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+  └─vg-swap2  253:2    0  4.9G  0 lvm  [SWAP]
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# free -h
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.1Gi        77Mi        17Mi       578Mi       468Mi
+Swap:         7.9Gi       0.0Ki       7.9Gi
+[root@localhost ~]# free -m
+              total        used        free      shared  buff/cache   available
+Mem:           1806        1150          77          17         578         468
+Swap:          8071           0        8071
+[root@localhost ~]# cat /proc/swaps
+Filename				Type		Size	Used	Priority
+/dev/dm-1                               partition	3145724	256	-2
+/dev/dm-2                               partition	5119996	0	-3
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+  └─vg-swap2  253:2    0  4.9G  0 lvm  [SWAP]
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+*************************************************************************************
+7. Also we can turnoff swap partition
+
+
+[root@localhost ~]# swapoff /dev/vg/swap2
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+  └─vg-swap2  253:2    0  4.9G  0 lvm  
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# cat /proc/swaps 
+Filename				Type		Size	Used	Priority
+/dev/dm-1                               partition	3145724	72	-2
+[root@localhost ~]# 
+*****************************************************************************************
+
+==========================================================================================================
+
+SWAP extension
+
+> Downtime required  as we  need to turnoff swap and turon
+
+[ No downtime method :- 
+IN Prod servers better to go with creating new lv and mkswap and then turnon swap
+1. vg needs to have space
+2. lvcreate -L [size] -n [new_swap_name] [vg_name]
+3. mkswap  /dev/[vgname]/[new_swap_name]
+4. swapon /dev/[vgname/[new_swap_name]
+]
+
+=======================================================================================================
+
+
+1. Attached new disk 5G
+
+[Better to create partitions
+
+[root@localhost ~]# for host in `ls /sys/class/scsi_host/`;do echo "- - -" >/sys/class/scsi_host/${host}/scan;done
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+  └─vg-swap2  253:2    0  4.9G  0 lvm  
+sdb             8:16   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+
+********************************************************************************
+2. Partition creating
+
+
+
+[root@localhost ~]# fdisk  /dev/sdb 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xe4953f33.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 82
+Changed type of partition 'Linux' to 'Linux swap / Solaris'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+  └─vg-swap2  253:2    0  4.9G  0 lvm  
+sdb             8:16   0    5G  0 disk 
+└─sdb1          8:17   0    5G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree  
+  rhel   1   2   0 wz--n- <29.00g      0 
+  vg     1   1   0 wz--n-  <5.00g 116.00m
+*******************************************************************************************
+
+2. Extending VG
+
+
+[root@localhost ~]# vgextend  vg /dev/sdb1
+  Physical volume "/dev/sdb1" successfully created.
+  Volume group "vg" successfully extended
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  rhel   1   2   0 wz--n- <29.00g     0 
+  vg     2   1   0 wz--n-   9.99g <5.11g
+[root@localhost ~]# vgs -v
+  VG   Attr   Ext   #PV #LV #SN VSize   VFree  VG UUID                                VProfile
+  rhel wz--n- 4.00m   1   2   0 <29.00g     0  0i6Mpy-qlmS-oNmB-fz0M-RkoP-92R9-AvHFgT         
+  vg   wz--n- 4.00m   2   1   0   9.99g <5.11g AbO2mV-9iHJ-sJ38-9vMp-yvmE-9CHM-VoCsza  
+*************************************************************************************
+3. Extending LV
+       
+[root@localhost ~]# lvextend  -L +4G /dev/vg/swap2 
+  Size of logical volume vg/swap2 changed from 4.88 GiB (1250 extents) to 8.88 GiB (2274 extents).
+  Logical volume vg/swap2 successfully resized.
+
+[root@localhost ~]# lvs
+  LV    VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root  rhel -wi-ao---- <26.00g                                                    
+  swap  rhel -wi-ao----   3.00g                                                    
+  swap2 vg   -wi-a-----   8.88g                                                    
+[root@localhost ~]# free -h
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.1Gi       100Mi        17Mi       584Mi       496Mi
+Swap:         3.0Gi       0.0Ki       3.0Gi
+*****************************************************************************************
+4. Turning off swap 
+
+[root@localhost ~]# swapoff /dev/vg/swap2
+******************************************************************************************
+5. Making swap memory
+
+[root@localhost ~]# mkswap /dev/vg/swap2 
+mkswap: /dev/vg/swap2: warning: wiping old swap signature.
+Setting up swapspace version 1, size = 8.9 GiB (9537843200 bytes)
+no label, UUID=2e5293ed-043d-4307-bc08-5f9af9bf6592
+********************************************************************************************
+6. Turning on swap memory
+
+[root@localhost ~]# swapon /dev/vg/swap2
+[root@localhost ~]# free -h
+              total        used        free      shared  buff/cache   available
+Mem:          1.8Gi       1.1Gi        93Mi        17Mi       584Mi       490Mi
+Swap:          11Gi       0.0Ki        11Gi
+[root@localhost ~]# cat /proc/swaps 
+Filename				Type		Size	Used	Priority
+/dev/dm-1                               partition	3145724	64	-2
+/dev/dm-2                               partition	9314300	0	-3
+[root@localhost ~]#
+
+********************************************************************************************
+========================================================================================================
+
+
+
+
