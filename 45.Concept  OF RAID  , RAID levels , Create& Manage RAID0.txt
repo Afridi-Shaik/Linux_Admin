@@ -431,3 +431,25 @@ mdadm: Cannot remove /dev/sdc from /dev/md1, array will be failed.
 [root@localhost ~]#  
 
 ================================================================================================================
+
+Comments:-
+
+1. mdadm --->  creae , Mange , configure , stop RAID
+2. RAID package name ?
+
+Installed Packages
+mdadm.x86_64                                            4.2-8.el8                                             @rhel-8-for-x86_64-baseos-rpms
+[root@localhost ~]# 
+
+3. Boot and Root RAID configuration ?
+
+we need to make hard ware level and then install rhel OS
+
+4. diff Ubuntu vs Redhat ?
+
+Ubuntu --> Debian 
+Redhat --> Fedora
+
+different community, different repos and some cmds are different
+
+5.Mostly Physical Hardware  Servers configuration is RAID1
