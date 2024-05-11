@@ -1,0 +1,512 @@
+Create & Manage RAID 1
+===================================================================
+
+
+
+
+
+                                         RAID 0
+                                        [Mirroring]
+                                           |
+					   |
+                    ________________________________________________________
+		   |							    |
+               Block 1                                                  Block 2
+               Block 3                        =                         Block 4
+               Block 5                                                  Block 6
+               Block 7                                                  Block 8
+  
+              [drive 1]                                                [drive 2]
+
+
+Pre requisites :-
+
+Minimum 2 disks required
+
+
+
+disk1  block it will be same data in  disk2 block
+
+if one disk fail data will be intact 
+
+
+Advantages :-
+
+> Performance depends on disk type
+
+> Read & Write in single drive have excellent performance. 
+[ RAID 0 >>>>> RAID1 interms of performance ]
+
+> If drive fail. we don't require to rebuild data  . data has been copied to the replacement drive
+
+> Simple technology
+
+
+
+Dis Advantages:-
+
+> Performance compare to RAID0  half we get
+
+> disk space will be half size
+
+1TB ----> 500GB [ RAID 1 FS]
+
+> no Hotswap facility 
+
+
+Uses:-
+> RAID 1 is ideal for  Mission critical storage , small servers required two drives
+
+
+=============================================================================================================================================
+
+
+
+=======================================================================================================================================
+
+1. Create RAID partition on 2 X 5G and 5G disk add to the server
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+sdb             8:16   0    5G  0 disk 
+sdc             8:32   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x4351ad7d.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): fd
+Changed type of partition 'Linux' to 'Linux raid autodetect'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# fdisk /dev/sdb
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xbda5c43c.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): fd
+Changed type of partition 'Linux' to 'Linux raid autodetect'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+└─sda1          8:1    0    5G  0 part 
+sdb             8:16   0    5G  0 disk 
+└─sdb1          8:17   0    5G  0 part 
+sdc             8:32   0    5G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+
+there is now RAID configiured for this
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : 
+unused devices: <none>
+[root@localhost ~]# 
+
+****************************************************************************************************
+
+2. Configuring RAID 1
+
+
+[root@localhost ~]# mdadm -C /dev/md0 -l 1 -n 2 /dev/sda1 /dev/sdb1 
+mdadm: Note: this array has metadata at the start and
+    may not be suitable as a boot device.  If you plan to
+    store '/boot' on this device please ensure that
+    your boot-loader understands md/v1.x metadata, or use
+    --metadata=0.90
+Continue creating array? y
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md0 started.
+[root@localhost ~]# cat  /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sdb1[1] sda1[0]
+      5236736 blocks super 1.2 [2/2] [UU]
+      [===================>.]  resync = 99.3% (5201024/5236736) finish=0.0min speed=208040K/sec
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+************************************************************************************************************
+
+3. RAID details
+
+
+[root@localhost ~]# mdadm --detail /dev/md0
+/dev/md0:
+           Version : 1.2
+     Creation Time : Sat May 11 12:36:50 2024
+        Raid Level : raid1
+        Array Size : 5236736 (4.99 GiB 5.36 GB)
+     Used Dev Size : 5236736 (4.99 GiB 5.36 GB)
+      Raid Devices : 2
+     Total Devices : 2
+       Persistence : Superblock is persistent
+
+       Update Time : Sat May 11 12:37:16 2024
+             State : clean 
+    Active Devices : 2
+   Working Devices : 2
+    Failed Devices : 0
+     Spare Devices : 0
+
+Consistency Policy : resync
+
+              Name : localhost.localdomain:0  (local to host localhost.localdomain)
+              UUID : 67bbb042:2451c563:828cc839:dc739fed
+            Events : 17
+
+    Number   Major   Minor   RaidDevice State
+       0       8        1        0      active sync   /dev/sda1
+       1       8       17        1      active sync   /dev/sdb1
+[root@localhost ~]#
+
+************************************************************************************************************************
+
+
+How data actually store
+
+
+                                     Linux Classes
+                                          |
+					  |
+                    _____________________RAID 1______________________________
+		   |		      [ Mirroring ]	      		    |
+		  [L]                                                      [L]
+                  [i]                                                      [i]
+		  [n]                                                      [n]
+                  [u]                                                      [u]
+		  [x]                                                      [x]
+                  [ ]                                                      [ ]
+		  [C]                                                      [C]
+                  [l]                                                      [l]
+		  [a]                                                      [a]
+                  [s]                                                      [s]
+		  [s]                                                      [s]
+                  [e]                                                      [e]
+                  [s]                                                      [s]
+
+                Disk 1              RAID Capacity =1TB                    Disk 2 
+              [ 1TB] 							  [ 1TB ]
+
+Same data store in two disk
+
+if disk1 fail our data will be safe in disk2 . 
+> power off server 
+> remove disk1 
+> new disk 
+> copy with disk2 [ sync raid1 ]
+
+
+RAID speed ---> depends on disk performance
+************************************************************************************************************************************
+3. Formating FS and Mounting RAID 1 FS
+
+[root@localhost ~]# mkfs.ext4  /dev/md0 
+mke2fs 1.45.6 (20-Mar-2020)
+Creating filesystem with 1309184 4k blocks and 327680 inodes
+Filesystem UUID: cac9571a-4c9d-48bb-b185-90a5a553fd0b
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE            LABEL                   UUID                                   MOUNTPOINT
+sda                                                                                            
+└─sda1        linux_raid_member localhost.localdomain:0 67bbb042-2451-c563-828c-c839dc739fed   
+  └─md0       ext4                                      cac9571a-4c9d-48bb-b185-90a5a553fd0b   
+sdb                                                                                            
+└─sdb1        linux_raid_member localhost.localdomain:0 67bbb042-2451-c563-828c-c839dc739fed   
+  └─md0       ext4                                      cac9571a-4c9d-48bb-b185-90a5a553fd0b   
+sdc                                                                                            
+sr0                                                                                            
+nvme0n1                                                                                        
+├─nvme0n1p1   xfs                                       56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2   LVM2_member                               dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root xfs                                       f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap swap                                      3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# mkdir /raid1
+[root@localhost ~]# mount /dev/md0  /raid1/
+[root@localhost ~]# df -hTP /raid1/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/md0       ext4  4.9G   24K  4.6G   1% /raid1
+[root@localhost ~]# 
+
+*******************************************************************************************************************
+
+4. Storing the data 
+
+[root@localhost ~]# cd /raid1/
+[root@localhost raid1]# touch {1..20}
+[root@localhost raid1]# cal > cal.txt
+[root@localhost raid1]# echo " Linux Classes" > rhcsa.txt
+[root@localhost raid1]# mkdir aa bb cc dd
+[root@localhost raid1]# ls
+1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9  aa  bb  cal.txt  cc  dd  lost+found  rhcsa.txt
+[root@localhost raid1]
+
+**********************************************************************************************************************
+
+Making disk Faulty
+***********************************************************************************************************************
+
+1.  Currently both disk are active
+[root@localhost ~]#  cat /proc/mdstat 
+Personalities : [raid1] 
+md0 : active raid1 sdb1[1] sda1[0]
+      5236736 blocks super 1.2 [2/2] [UU]
+      
+unused devices: <none>
+*******************************************************************************************
+
+2. Making faulty with -f 
+
+[root@localhost ~]# mdadm /dev/md0 -f /dev/sda1 
+mdadm: set /dev/sda1 faulty in /dev/md0
+
+It showing as 'F' which represents faulty disk
+
+[root@localhost ~]#  cat /proc/mdstat 
+Personalities : [raid1] 
+md0 : active raid1 sdb1[1] sda1[0](F)
+      5236736 blocks super 1.2 [2/1] [_U]
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+*******************************************************************************************
+3. In details  it showing 
+
+
+state ---->> degraded
+working and active is 1 only
+
+/dev/sda1 showing faulty
+
+
+[root@localhost ~]# mdadm --detail /dev/md0
+/dev/md0:
+           Version : 1.2
+     Creation Time : Sat May 11 12:36:50 2024
+        Raid Level : raid1
+        Array Size : 5236736 (4.99 GiB 5.36 GB)
+     Used Dev Size : 5236736 (4.99 GiB 5.36 GB)
+      Raid Devices : 2
+     Total Devices : 2
+       Persistence : Superblock is persistent
+
+       Update Time : Sat May 11 12:50:42 2024
+             State : clean, degraded 
+    Active Devices : 1
+   Working Devices : 1
+    Failed Devices : 1
+     Spare Devices : 0
+
+Consistency Policy : resync
+
+              Name : localhost.localdomain:0  (local to host localhost.localdomain)
+              UUID : 67bbb042:2451c563:828cc839:dc739fed
+            Events : 19
+
+    Number   Major   Minor   RaidDevice State
+       -       0        0        0      removed
+       1       8       17        1      active sync   /dev/sdb1
+
+       0       8        1        -      faulty   /dev/sda1
+[root@localhost ~]# 
+
+
+****************************************************************************************************
+
+4. we need to replace /dev/sda1 with fresh disk with same size 
+
+
+using /dev/sdc --->5G
+
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+sda             8:0    0    5G  0 disk  
+└─sda1          8:1    0    5G  0 part  
+  └─md0         9:0    0    5G  0 raid1 /raid1
+sdb             8:16   0    5G  0 disk  
+└─sdb1          8:17   0    5G  0 part  
+  └─md0         9:0    0    5G  0 raid1 /raid1
+sdc             8:32   0    5G  0 disk  
+
+[root@localhost ~]# fdisk /dev/sdc 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xf0cd25fa.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): fd
+Changed type of partition 'Linux' to 'Linux raid autodetect'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+
+************************************************************************
+
+5. Before replace  unmount FS
+
+
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid1] 
+md0 : active raid1 sdb1[1] sda1[0](F)
+      5236736 blocks super 1.2 [2/1] [_U]
+      
+unused devices: <none>
+[root@localhost ~]# 
+************************************************************************************
+
+6. removing /dev/sda1 disk
+
+[we have done hotswap [ online]  in Physical server[HP,Dell] RAID  we need to power off server ]
+
+[root@localhost ~]# mdadm /dev/md0 -r /dev/sda1
+mdadm: hot removed /dev/sda1 from /dev/md0
+[root@localhost ~]# 
+
+**********************************************************************************************
+7. Attached new disk [/dev/sdc1] . and data resyncing  started now ......
+
+
+[root@localhost ~]# mdadm /dev/md0  -a /dev/sdc1
+mdadm: added /dev/sdc1
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid1] 
+md0 : active raid1 sdc1[2] sdb1[1]
+      5236736 blocks super 1.2 [2/1] [_U]
+      [======>..............]  recovery = 34.3% (1801088/5236736) finish=0.2min speed=200120K/sec
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid1] 
+md0 : active raid1 sdc1[2] sdb1[1]
+      5236736 blocks super 1.2 [2/2] [UU]
+      
+unused devices: <none>
+[root@localhost ~]#
+
+************************************************************************************************************
+
+
+8. Mounting FS and checking data
+
+[root@localhost ~]# mount /dev/md0 /raid1/
+[root@localhost ~]# cd /raid1/
+[root@localhost raid1]# ls
+1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9  aa  bb  cal.txt  cc  dd  lost+found  rhcsa.txt
+[root@localhost raid1]# 
+***************************************************************************************************************************
+
+Comments :-
+
+1. How many Disk RAID 1 capable for configuring  ---> 32 disks
+
+2. RAID  without controller card it won't be configured 
+[ Physical RAID ]
+ 
