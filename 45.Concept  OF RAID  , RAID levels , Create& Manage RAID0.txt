@@ -1,0 +1,433 @@
+Concept  OF RAID  , RAID levels , Create and Manage RAID-0 
+
+
+
+RAID ---> Performance Increase &  Data Reliability[safe] Increases [ Redundant Array of Independent/In expensive Drive ]
+
+
+Mechanism/Conecpt ---> Multiple disks operating in parallel
+
+
+RAID 0 ----> Striping [ data store in different portion of disk ]
+RAID 1 ----> Mirroring [ data copy in different disk ]  ----> Falulttolerance
+RAID 5 ----> Striping with Parity [ Performance  + Redundancy of data ( if one disk fail we can recover the data ) ]
+RAID 6 ----> Striping with double Parity [Performance + Fault tolerance ( if one/two disk fail we can also recover the data ) ]
+RAID 10----> Stripping + Mirroring  [ lowerend striping  upperend mirroring or viseversa]
+
+Striping :-
+*************************************************************************
+
+Performance Increases due to  multiple  disks using
+
+
+                                         RAID 0
+                                        [striping]
+                                           |
+					   |
+                    ________________________________________________________
+		   |							    |
+               Block 1                                                  Block 2
+               Block 3                                                  Block 4
+               Block 5                                                  Block 6
+               Block 7                                                  Block 8
+  
+              [drive 1]                                                [drive 2]
+
+
+Advantages:-
+
+> Great Performance  in both Read and Write Operations. No overhead  by parity controls 
+> Storage fully utlize
+> This technology easily Implemented
+
+
+Disadvantage:-
+> RAID 0 is not fault tolerant . if one disk fails all the data in RAID 0  array are lost . It should not used for  mission - critical systems
+> No data safety issue
+
+Uses :-
+Performance systems[ video editing, vfx, database servers]
+
+
+
+echo "Linux Classes" > [ raid fs ]
+
+                                     Linux Classes
+                                          |
+					  |
+                    ________________________________________________________
+		   |							    |
+		  [L]                                                      [i]
+                  [n]                                                      [u]
+		  [x]                                                      [c]
+                  [l]                                                      [a]
+		  [s]                                                      [s]
+                  [e]                                                      [s]
+
+                Disk 1              RAID Capacity =2TB                    Disk 2 
+
+
+
+2 disk ---> 2X faster
+3 disk ---> 3X faster
+4 disk ---> 4X faster
+
+        
+===============================================================================================================
+
+RAID -0 Practical 
+
+
+Pre requsisites :-
+
+4GB - 2disks
+2GB - 3disks                
+
+
+RAID Partition Code - fd
+
+to check existing RAID configuration - /proc/mdstat
+==============================================================================================================
+
+
+1. Added pre requisites capcity disk and changing partition type fd [ RAID]
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    4G  0 disk 
+sdb             8:16   0    4G  0 disk 
+sdc             8:32   0    2G  0 disk 
+sdd             8:48   0    2G  0 disk 
+sde             8:64   0    2G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]# fdisk /dev/sda 
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x8606c126.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-8388607, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-8388607, default 8388607): 
+
+Created a new partition 1 of type 'Linux' and of size 4 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): fd
+Changed type of partition 'Linux' to 'Linux raid autodetect'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# fdisk /dev/sdb
+
+Welcome to fdisk (util-linux 2.32.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0x6115ef1e.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): 
+
+Using default response p.
+Partition number (1-4, default 1): 
+First sector (2048-8388607, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-8388607, default 8388607): 
+
+Created a new partition 1 of type 'Linux' and of size 4 GiB.
+
+Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): fd
+Changed type of partition 'Linux' to 'Linux raid autodetect'.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+[root@localhost ~]# partprobe 
+[root@localhost ~]# 
+
+***************************************************************************************
+
+2. As of now  RAID is not configured
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : 
+unused devices: <none>
+[root@localhost ~]# 
+
+*******************************************************************************************
+
+3. Creating RAID
+
+mdadm -C [RAID_name] -l [RAID_lvl] -n [number of disk for RAID configuration] [disk/partition full path]
+
+[root@localhost ~]# mdadm -C /dev/md0 -l 0 -n 2 /dev/sda1 /dev/sdb1 
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md0 started.
+[root@localhost ~]# 
+
+
+It will show as raid0  
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+sda             8:0    0    4G  0 disk  
+└─sda1          8:1    0    4G  0 part  
+  └─md0         9:0    0    8G  0 raid0 
+sdb             8:16   0    4G  0 disk  
+└─sdb1          8:17   0    4G  0 part  
+  └─md0         9:0    0    8G  0 raid0 
+
+
+Showing RAID0 is active 
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid0] 
+md0 : active raid0 sdb1[1] sda1[0]
+      8380416 blocks super 1.2 512k chunks
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+
+
+Full Details of RAID
+
+> mdadm -D /dev/md0
+> mdadm -detail /dev/md0
+
+[root@localhost ~]# mdadm -D /dev/md0
+/dev/md0:
+           Version : 1.2
+     Creation Time : Sat May 11 09:43:34 2024
+        Raid Level : raid0
+        Array Size : 8380416 (7.99 GiB 8.58 GB)
+      Raid Devices : 2
+     Total Devices : 2
+       Persistence : Superblock is persistent
+
+       Update Time : Sat May 11 09:43:34 2024
+             State : clean 
+    Active Devices : 2
+   Working Devices : 2
+    Failed Devices : 0
+     Spare Devices : 0
+
+            Layout : original
+        Chunk Size : 512K
+
+Consistency Policy : none
+
+              Name : localhost.localdomain:0  (local to host localhost.localdomain)
+              UUID : 6d6576c1:1b02beea:dbda8e41:dd9ffc7b
+            Events : 0
+
+    Number   Major   Minor   RaidDevice State
+       0       8        1        0      active sync   /dev/sda1
+       1       8       17        1      active sync   /dev/sdb1
+[root@localhost ~]# 
+
+************************************************************************************************
+
+4. We can  Format and mount directory / LVM can be created 
+
+[root@localhost ~]# mkfs.ext4 /dev/md0
+mke2fs 1.45.6 (20-Mar-2020)
+Creating filesystem with 2095104 4k blocks and 524288 inodes
+Filesystem UUID: 4ff02c3e-3c05-4a55-93f3-d415ed0e48b8
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# mkdir /raid0
+[root@localhost ~]# mount /dev/md0 /raid0/
+[root@localhost ~]# df -hTP /raid0/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/md0       ext4  7.9G   36M  7.4G   1% /raid0
+[root@localhost ~]# 
+
+********************************************************************************************************
+
+5. Creating Files& Permanent Mount
+
+[root@localhost ~]# cd /raid0/
+[root@localhost raid0]# touch {1..20}
+[root@localhost raid0]# cal > cal
+[root@localhost raid0]# mkdir aa bb cc
+[root@localhost raid0]# ls
+1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9  aa  bb  cal  cc  lost+found
+[root@localhost raid0]# 
+
+Need to make in fstab entry
+
+[root@localhost raid0]# cat /etc/fstab | grep raid
+/dev/md0   /raid0   ext4 defaults 0 0
+[root@localhost raid0]#
+
+*********************************************************************************************************
+Note :- 
+If any disk /dev/sda1 or /dev/sdb1 is failed  then all data is corrupted.  Backup must be configured . 
+
+[root@localhost raid0]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+sda             8:0    0    4G  0 disk  
+└─sda1          8:1    0    4G  0 part  
+  └─md0         9:0    0    8G  0 raid0 /raid0
+sdb             8:16   0    4G  0 disk  
+└─sdb1          8:17   0    4G  0 part  
+  └─md0         9:0    0    8G  0 raid0 /raid0
+
+******************************************************************************************************************
+
+
+Removing RAID 0
+
+
+[root@localhost ~]# umount /raid0
+[root@localhost ~]# mdadm --stop /dev/md0 
+mdadm: stopped /dev/md0
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid0] 
+unused devices: <none>
+[root@localhost ~]# 
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    4G  0 disk 
+└─sda1          8:1    0    4G  0 part 
+sdb             8:16   0    4G  0 disk 
+└─sdb1          8:17   0    4G  0 part 
+
+***********************************************************************************************************************
+
+===========================================================================================================
+
+
+Configuring RAID 0 with 3 disks with LVM concept
+
+***************************************************************************************
+1. we have  3 X 2GB disk and configuring RAID on raw disk without parittion[ best practice to create parittion]
+
+
+
+[root@localhost ~]# mdadm -C /dev/md1 -l 0 -n 3 /dev/sdc /dev/sdd /dev/sde 
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md1 started.
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid0] 
+md1 : active raid0 sde[2] sdd[1] sdc[0]
+      6282240 blocks super 1.2 512k chunks
+      
+unused devices: <none>
+[root@localhost ~]# mdadm --detail /dev/md1
+/dev/md1:
+           Version : 1.2
+     Creation Time : Sat May 11 10:19:49 2024
+        Raid Level : raid0
+        Array Size : 6282240 (5.99 GiB 6.43 GB)
+      Raid Devices : 3
+     Total Devices : 3
+       Persistence : Superblock is persistent
+*****************************************************************************************************
+
+2.PV,VG,LV ---> creation and Format FS  + mount FS
+
+
+[root@localhost ~]# pvcreate /dev/md1 
+  Physical volume "/dev/md1" successfully created.
+
+[root@localhost ~]# vgcreate vg /dev/md1
+  Volume group "vg" successfully created
+
+[root@localhost ~]# lvcreate -L 2G -n lv vg
+  Logical volume "lv" created.
+
+[root@localhost ~]# vgs
+  VG   #PV #LV #SN Attr   VSize   VFree 
+  rhel   1   2   0 wz--n- <29.00g     0 
+  vg     1   1   0 wz--n-  <5.99g <3.99g
+
+[root@localhost ~]# lvs
+  LV   VG   Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root rhel -wi-ao---- <26.00g                                                    
+  swap rhel -wi-ao----   3.00g                                                    
+  lv   vg   -wi-a-----   2.00g  
+                                                  
+[root@localhost ~]# pvs
+  PV             VG   Fmt  Attr PSize   PFree 
+  /dev/md1       vg   lvm2 a--   <5.99g <3.99g
+  /dev/nvme0n1p2 rhel lvm2 a--  <29.00g     0 
+
+
+[root@localhost ~]# mkfs.ext4 /dev/vg/lv 
+mke2fs 1.45.6 (20-Mar-2020)
+Creating filesystem with 524288 4k blocks and 131072 inodes
+Filesystem UUID: afa51596-e495-4471-98e1-08f0416f3cdc
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# mount /dev/vg/lv/ /raid0/
+mount: /raid0: special device /dev/vg/lv/ does not exist (a path prefix is not a directory).
+[root@localhost ~]# mount /dev/vg/lv /raid0/
+[root@localhost ~]# 
+
+            
+***********************************************************************************************
+
+====================================================================================================
+
+
+Note :- we can't make disk faulty in RAID 0 concept
+
+
+
+              Name : localhost.localdomain:1  (local to host localhost.localdomain)
+              UUID : ac71ed1c:7cbb942b:4f2d7fc4:f9b6d0ee
+            Events : 0
+
+    Number   Major   Minor   RaidDevice State
+       0       8       32        0      active sync   /dev/sdc
+       1       8       48        1      active sync   /dev/sdd
+       2       8       64        2      active sync   /dev/sde
+[root@localhost ~]# mdadm /dev/md1 -f /dev/sdc 
+mdadm: Cannot remove /dev/sdc from /dev/md1, array will be failed.
+[root@localhost ~]#  
+
+================================================================================================================
