@@ -1,0 +1,300 @@
+Create & Manage RAID 5
+==================================================================================
+
+Striping + Parity [ checksum] ---> to protect data
+
+
+Pre requisites :-
+
+ Minimum  ---> 3 disks
+ Maximum  ---> 16 disks
+
+
+
+
+
+                                         RAID 5
+                                [Striping + Parity across drives]
+                                           |
+					   |
+                    ________________________________________________________
+		   |		|     				|	    |
+               [block 1a]  [block1b]                     [block1c]     [blockb1]*
+               [block 2a]  [block2b]                     [blockb2]*    [block2c]
+               [block 3a]  [blockb3]*                    [block3b]     [block3c]
+               [block b4]* [block4a]                     [block4b]     [block4c]
+                drive1       drive2                        drive3        drive4 
+
+
+> we are using 3 disk for data store in block  and 1 disk for parity
+
+ [block 1a] +  [block1b]  + [block1c]  = [blockb1]
+
+
+Parity disk we can't mention like which is being used  as I mentioned  [*] it using all the drives 
+
+Parity used for checksum purpose of data
+
+
+Advantages :-
+
+> Read data fast & Write data slow
+> 1 drive fails , Still have access to the data.
+> even though replace disk with failed one ---> storage controller ---> rebuilds the data 
+
+
+Dis Advantages :-
+
+> Drive fails  ----> effect Throughput.
+> Complex ---> bcoz we are using diff checksum for error detection and error correction
+
+4TB  ---> Failed
+
+Replacing & Rebuilding data ---> Takes longer time
+
+[ while replacing  if another disk also failed. 
+
+Then data loss will happen due to  Parity for single disk ]
+
+
+
+Use :-
+> Excellent Performance + data  security
+> Ideal for file + apps servers which have limited no.of data drives
+
+****************************************************************************************************************************
+
+
+
+                                  N = 1011  0101
+                                           |
+					   |
+                    _____________________________________________
+		   |	          	  |     		|	    
+               [1011] <--chksum parity--> [0101]               [    ]
+               [    ]    Data Bits        [    ]               [0010]     ---> [1011 - 0101= 0010]  Parity Bits
+               [    ]                     [    ]               [    ]    
+               [    ]                     [    ]               [    ]    
+               [    ]                     [    ]               [    ]    
+
+              Disk 1 [1 TB]               Disk 2[1TB]          Disk 3[1TB]
+                     RAID capacity=2TB
+                                   
+
+  					  RAID 5
+                                [Striping + Parity across drives]
+
+=========================================================================================================================================
+RAID 5
+==================================================================================================================================
+
+
+1. Attached 4G X 4 ISCI storage luns to the server
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    4G  0 disk 
+sdb             8:16   0    4G  0 disk 
+sdc             8:32   0    4G  0 disk 
+sdd             8:48   0    4G  0 disk 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+
+********************************************************************************
+
+2. Creating  RAID 5 and checking the details
+
+
+[root@localhost ~]# mdadm --create /dev/md0 -l 5 -n 3 /dev/sda /dev/sdb /dev/sdc 
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md0 started.
+
+[root@localhost ~]# mdadm --detail /dev/dm0
+mdadm: cannot open /dev/dm0: No such file or directory
+[root@localhost ~]# mdadm --detail /dev/md0 
+/dev/md0:
+           Version : 1.2
+     Creation Time : Sat May 11 14:14:01 2024
+        Raid Level : raid5
+        Array Size : 8378368 (7.99 GiB 8.58 GB)
+     Used Dev Size : 4189184 (4.00 GiB 4.29 GB)
+      Raid Devices : 3
+     Total Devices : 3
+       Persistence : Superblock is persistent
+
+       Update Time : Sat May 11 14:14:17 2024
+             State : clean, degraded, recovering 
+    Active Devices : 2
+   Working Devices : 3
+    Failed Devices : 0
+     Spare Devices : 1
+
+            Layout : left-symmetric
+        Chunk Size : 512K
+
+Consistency Policy : resync
+
+    Rebuild Status : 81% complete
+
+              Name : localhost.localdomain:0  (local to host localhost.localdomain)
+              UUID : 020f68dc:58594441:c6a02c95:acc2e804
+            Events : 13
+
+    Number   Major   Minor   RaidDevice State
+       0       8        0        0      active sync   /dev/sda
+       1       8       16        1      active sync   /dev/sdb
+       3       8       32        2      spare rebuilding   /dev/sdc
+[root@localhost ~]# 
+
+************************************************************************************************
+
+3. Checking  RAID 5
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid6] [raid5] [raid4] 
+md0 : active raid5 sdc[3] sdb[1] sda[0]
+      8378368 blocks super 1.2 level 5, 512k chunk, algorithm 2 [3/3] [UUU]
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+
+************************************************************************************************
+
+4. Format and Mount FS
+
+[root@localhost ~]# mkfs.xfs /dev/md0 
+log stripe unit (524288 bytes) is too large (maximum is 256KiB)
+log stripe unit adjusted to 32KiB
+meta-data=/dev/md0               isize=512    agcount=8, agsize=261760 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=2094080, imaxpct=25
+         =                       sunit=128    swidth=256 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=8 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+[root@localhost ~]# mkdir /raid5
+[root@localhost ~]# mount /dev/md0 /raid5/
+[root@localhost ~]# df -hTP /raid5/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/md0       xfs   8.0G   90M  7.9G   2% /raid5
+[root@localhost ~]# 
+
+
+*************************************************************************************************
+
+5. Store data
+
+[root@localhost ~]# cd /raid5/
+[root@localhost raid5]# ll
+total 0
+[root@localhost raid5]# touch {1..20}
+[root@localhost raid5]# mkdir aa bb cc dd
+[root@localhost raid5]# cal > cal.txt
+[root@localhost raid5]# ls
+1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9  aa  bb  cal.txt  cc  dd
+[root@localhost raid5]# 
+
+*****************************************************************************************************
+
+6. Making 1 disk faulty  and check data [checksum]
+
+
+Before :-
+
+[root@localhost ~]# mdadm -D  /dev/md0  | grep -E 'Active|Array'
+        Array Size : 8378368 (7.99 GiB 8.58 GB)
+    Active Devices : 3
+[root@localhost ~]#
+
+
+Making Faulty Disk :-
+
+[root@localhost ~]# mdadm /dev/md0 -f /dev/sda 
+mdadm: set /dev/sda faulty in /dev/md0
+
+After:-
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid6] [raid5] [raid4] 
+md0 : active raid5 sdc[3] sdb[1] sda[0](F)
+      8378368 blocks super 1.2 level 5, 512k chunk, algorithm 2 [3/2] [_UU]
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+*******************************************************************************************************
+
+7. Removing Faulty disk 
+
+[root@localhost ~]# mdadm  /dev/md0 -r /dev/sda 
+mdadm: hot removed /dev/sda from /dev/md0
+[root@localhost ~]# 
+
+
+********************************************************************************************************
+
+8. Using /dev/sdd disk 
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+sda             8:0    0    4G  0 disk  
+sdb             8:16   0    4G  0 disk  
+└─md0           9:0    0    8G  0 raid5 /raid5
+sdc             8:32   0    4G  0 disk  
+└─md0           9:0    0    8G  0 raid5 /raid5
+sdd             8:48   0    4G  0 disk  
+
+
+[root@localhost ~]# mdadm  /dev/md0 -a /dev/sdd
+mdadm: added /dev/sdd
+
+Data is rebuilding/recovery
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid6] [raid5] [raid4] 
+md0 : active raid5 sdd[4] sdc[3] sdb[1]
+      8378368 blocks super 1.2 level 5, 512k chunk, algorithm 2 [3/2] [_UU]
+      [========>............]  recovery = 43.0% (1805440/4189184) finish=0.1min speed=225680K/sec
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+
+Now there is no issues in RAID lvl
+
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid6] [raid5] [raid4] 
+md0 : active raid5 sdd[4] sdc[3] sdb[1]
+      8378368 blocks super 1.2 level 5, 512k chunk, algorithm 2 [3/3] [UUU]
+      
+unused devices: <none>
+[root@localhost ~]# 
+
+************************************************************************************************************
+
+
+
+Comments :-
+
+1. prod environment Physical RAID used ---> server level configure & Manage
+
+> add disk
+> Firmware  ---> configuration  
+[Data center ]
+
+Dell :-
+https://www.youtube.com/watch?v=6_pGCZRk8KU
+
+HPE:-
+https://www.youtube.com/watch?v=0PwgjvbUq0c
+
