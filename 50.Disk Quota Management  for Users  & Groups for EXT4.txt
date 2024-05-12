@@ -1,0 +1,477 @@
+Disk Quota Management  for Users  & Groups for EXT4
+========================================================================
+
+some users occupy the free space  ----> keep unnecessary data 
+
+for important data ---> Users are unable to store
+
+Mechanism --->  storage limits define ---> Disk Quota utility we can use
+
+Quota ---> Limit ---> ISP, File transfer .. etc
+
+
+
+
+Soft Limit----> Warning!! msg -->  Quota exceed about to reach  [ Lower ]
+
+Hard Limit----> Quota Exceeded   [Higher]
+
+
+15 files creation Quota for user
+
+10 files create ---> Soft Limit [ warning It will show ]
+15 files created & 16th file unable to create ---> Hard Limit
+
+
+Grace Period :-
+
+Between Soft Limit and Hard Limit ---> Time Period
+
+10-15 file creation time period know as Grace Period
+
+
+
+Quota types
+
+1. Block size quota --->> disk how much size we are providing for particular user
+ [ suppose  we have provided 1GB user user  only use 1GB space ]
+
+2. Inode table space--->> it depends on how many files /directory he  can create
+
+3. Both Block + INode
+
+
+*********************************************************************************************************
+
+=========================================================================================
+Quota creation
+
+
+Pre Requisites :- Quota package required
+
+[root@localhost ~]# rpm -qa quota
+quota-4.04-14.el8.x86_64
+[root@localhost ~]# 
+==========================================================================================
+
+1. added 10G disk sdb and created partition sdb1 ---> formatted to ext4
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    5G  0 disk 
+sdb             8:16   0   10G  0 disk 
+└─sdb1          8:17   0   10G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+
+[root@localhost ~]# mkfs.ext4 /dev/sdb1 
+mke2fs 1.45.6 (20-Mar-2020)
+Creating filesystem with 2621184 4k blocks and 655360 inodes
+Filesystem UUID: da12f6d1-31b0-40e2-baee-cb955427cf85
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# blkid /dev/sdb1 
+/dev/sdb1: UUID="da12f6d1-31b0-40e2-baee-cb955427cf85" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="3f171ae6-01"
+[root@localhost ~]# 
+
+**************************************************************************************************************
+
+
+2. Quota Package installed
+
+[root@localhost ~]# rpm -qa quota
+quota-4.04-14.el8.x86_64
+[root@localhost ~]# 
+**************************************************************************************************************
+
+
+3. created users [a, b, c, d ]  + created group [quotagroup] 
+useradd [username]
+
+a:x:1001:1001::/home/a:/bin/bash
+b:x:1002:1002::/home/b:/bin/bash
+c:x:1003:1003::/home/c:/bin/bash
+d:x:1004:1004::/home/d:/bin/bash
+[root@localhost ~]# 
+
+
+quotagroup:x:1005:
+[root@localhost ~]# 
+****************************************************************************************************************
+
+4. added c,d users in quota group
+
+
+[root@localhost ~]# usermod -g quotagroup c
+
+[root@localhost ~]# usermod -g quotagroup d
+
+[root@localhost ~]# id c
+uid=1003(c) gid=1005(quotagroup) groups=1005(quotagroup)
+[root@localhost ~]# id d
+uid=1004(d) gid=1005(quotagroup) groups=1005(quotagroup)
+[root@localhost ~]# 
+
+***************************************************************************************************************
+
+5. Mount the FS
+
+
+[root@localhost ~]# mkdir /quotadir
+[root@localhost ~]# mount /dev/sdb1 /quotadir/
+[root@localhost ~]# df -hTP /quotadir/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdb1      ext4  9.8G   24K  9.3G   1% /quotadir
+[root@localhost ~]# 
+
+******************************************************************************************************************
+
+6. check fs quota is enabled or not
+
+As of now quota is not defined
+
+[root@localhost ~]# mount | grep quotadir
+/dev/sdb1 on /quotadir type ext4 (rw,relatime,seclabel)
+[root@localhost ~]# 
+
+****************************************************************************************************************
+
+7.   quota information
+
+
+Quota types
+
+1. Block size quota --->> disk how much size we are providing for particular user
+ [ suppose  we have provided 1GB user user  only use 1GB space ]
+
+2. Inode table space--->> it depends on how many files /directory he  can create
+
+3. Both Block + INode
+********************************************************************************************************************
+
+8. to enable quota we need to define in fstab disk 
+
+usrquota ---> user  quota
+grpquota ---> group quota
+
+
+[root@localhost ~]# cat /etc/fstab | grep quotadir
+/dev/sdb1   /quotadir  ext4  defaults,usrquota,grpquota  0 0
+[root@localhost ~]#
+
+**************************************************************************************************************************
+
+9. Remount the FS then quota will display
+
+ 
+[root@localhost ~]# mount -o remount /quotadir/
+[root@localhost ~]# 
+
+
+[root@localhost ~]# mount | grep quotadir
+/dev/sdb1 on /quotadir type ext4 (rw,relatime,seclabel,quota,usrquota,grpquota)
+[root@localhost ~]# 
+
+**************************************************************************************************************************
+
+10. creating quota files for /quotadir for user and group
+
+[root@localhost ~]# quotacheck -cug /quotadir/
+
+[root@localhost ~]# cd /quotadir/
+
+[root@localhost quotadir]# ls
+aquota.group  aquota.user  lost+found
+
+*****************************************************************************************************************************
+
+11. Configuring Quota Policies
+
+
+Three types of Limits
+
+1. Soft Limit  ---> user /group cross this limit [flexible]
+2. hard Limit  ---> not able to cross this limit [exceeded]
+3. Grace Period --> after soft limit --> inode /blocks user use some timeperiod
+
+
+User :- 
+
+edquota [username]
+
+[root@localhost quotadir]# edquota a
+
+Blocks
+1000000 = 100MB ---> soft limit
+2000000 = 200MB ---> hard limit
+
+Inodes
+10 ---> 10 files/dir --> Soft Limit
+15 ---> 15 files/dir --> Hard Limit
+
+Disk quotas for user a (uid 1001):
+  Filesystem                   blocks       soft       hard     inodes     soft     hard
+  /dev/sdb1                         0     100000     200000         0        10       15                                                                                          
+ 
+
+Group :-
+
+edquota -g [groupname]
+
+[root@localhost quotadir]# edquota -g quotagroup 
+
+
+Disk quotas for group quotagroup (gid 1005):
+  Filesystem                   blocks       soft       hard     inodes     soft     hard
+  /dev/sdb1                         0      400000      500000      0       200      300
+                                                                                      
+
+************************************************************************************************
+
+12. changing permissions & Turn-on quota
+
+
+Before:-
+
+[root@localhost quotadir]# ls -ld /quotadir/
+drwxr-xr-x. 3 root root 4096 May 12 06:10 /quotadir/
+[root@localhost quotadir]# 
+
+
+[root@localhost quotadir]# chgrp quotagroup /quotadir/
+[root@localhost quotadir]# chmod 777 /quotadir/
+[root@localhost quotadir]# 
+
+After:-
+
+[root@localhost quotadir]# ls -ld /quotadir/
+drwxrwxrwx. 3 root quotagroup 4096 May 12 06:10 /quotadir/
+[root@localhost quotadir]#
+
+
+Turning on quota
+
+[root@localhost quotadir]# quotaon /quotadir/
+[root@localhost quotadir]# 
+
+
+*********************************************************************************************************************************
+
+13. checking User limit
+
+
+a ---> 10-15 files inode
+quotagrp ---> 200-300 files inode
+
+a ---> 200MB size
+quotagrp -->400MB size
+
+
+1. Inode limit checking
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+10 files created 
+
+[a@localhost ~]$ cd /quotadir/
+[a@localhost quotadir]$ touch a.user{1..10}.txt
+[a@localhost quotadir]$ ls
+aquota.group  aquota.user  a.user10.txt  a.user1.txt  a.user2.txt  a.user3.txt  a.user4.txt  a.user5.txt  a.user6.txt  a.user7.txt  a.user8.txt  a.user9.txt  lost+found
+[a@localhost quotadir]$ 
+
+
+creating 10-15 files ---> showing as quota exceeded  & files  created upto quota [ softlimit]
+
+
+[a@localhost quotadir]$ touch a.user{10..15}.txt
+sdb1: warning, user file quota exceeded.
+[a@localhost quotadir]$ ls
+aquota.group  a.user10.txt  a.user12.txt  a.user14.txt  a.user1.txt  a.user3.txt  a.user5.txt  a.user7.txt  a.user9.txt
+aquota.user   a.user11.txt  a.user13.txt  a.user15.txt  a.user2.txt  a.user4.txt  a.user6.txt  a.user8.txt  lost+found
+[a@localhost quotadir]$
+
+
+It will show quota exceed ---> reached Hardlimit
+
+[a@localhost quotadir]$ touch 1
+sdb1: write failed, user file limit reached.
+touch: cannot touch '1': Disk quota exceeded
+[a@localhost quotadir]$ 
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+2. Block Limit checking
+
+
+> creating 100MB file showing warning quota exceeded and created file
+
+[a@localhost quotadir]$ dd if=/dev/zero of=/quotadir/auser.txt bs=1M count=100
+sdb1: warning, user block quota exceeded.
+100+0 records in
+100+0 records out
+104857600 bytes (105 MB, 100 MiB) copied, 0.162882 s, 644 MB/s
+[a@localhost quotadir]$ ls -lh auser.txt 
+-rw-rw-r--. 1 a a 100M May 12 06:36 auser.txt
+[a@localhost quotadir]$ 
+
+
+>creating 200MB file showing error unable to write It written upto 196M
+
+[a@localhost quotadir]$ dd if=/dev/zero of=/quotadir/auser.txt bs=1M count=200
+sdb1: warning, user block quota exceeded.
+sdb1: write failed, user block limit reached.
+dd: error writing '/quotadir/auser.txt': Disk quota exceeded
+196+0 records in
+195+0 records out
+204800000 bytes (205 MB, 195 MiB) copied, 0.805998 s, 254 MB/s
+[a@localhost quotadir]$
+
+[a@localhost quotadir]$ ls -lh auser.txt 
+-rw-rw-r--. 1 a a 196M May 12 09:35 auser.txt
+[a@localhost quotadir]$
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+****************************************************************************************************************************************
+
+
+14. check limits/quota of user or group
+
+quota [user]
+
+[root@localhost quotadir]# quota a
+Disk quotas for user a (uid 1001): 
+     Filesystem  blocks   quota   limit   grace   files   quota   limit   grace
+      /dev/sdb1  200000* 100000  200000   6days       1      10      15 
+
+
+quota -g [groupname]
+       
+[root@localhost quotadir]# quota -g quotagroup 
+Disk quotas for group quotagroup (gid 1005): no limited resources used
+[root@localhost quotadir]# 
+
+
+repquota -a ---> show all disks and users and group quota
+
+[root@localhost ~]# repquota -a
+*** Report for user quotas on device /dev/sdb1
+Block grace time: 7days; Inode grace time: 7days
+                        Block limits                File limits
+User            used    soft    hard  grace    used  soft  hard  grace
+----------------------------------------------------------------------
+root      --      20       0       0              2     0     0       
+b         +-   20000   10000   20000  6days       1    10    20       
+
+
+[root@localhost ~]#
+*******************************************************************************************************************************************
+
+15.  setting Grace Period
+
+> quotaoff [fs]
+
+
+edquota -T [user]   ----> user
+
+edquota -T -g [groupname] ---> group
+
+
+[root@localhost ~]# edquota b
+
+
+Disk quotas for user b (uid 1002):
+  Filesystem                   blocks       soft       hard     inodes     soft     hard
+  /dev/sdb1                         0      10000      20000          0      10        20
+
+
+[root@localhost ~]# edquota -T b
+
+
+
+Times to enforce softlimit for user b (uid 1002):
+Time units may be: days, hours, minutes, or seconds
+  Filesystem                         block grace               inode grace
+  /dev/sdb1                             5minutes                  5minutes
+
+
+we can mention grace period  days, hours, minutes
+
+
+**********************************************************************************************************************************************
+
+
+16.Turnon quota
+
+
+
+Inode Grace Period
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+> created  10 files & inode graceperiod is not started
+
+
+[b@localhost quotadir]$ touch {1..10}
+
+[b@localhost quotadir]$ ls
+1  10  2  3  4  5  6  7  8  9  aquota.group  aquota.user  lost+found
+[b@localhost quotadir]$ quota b
+Disk quotas for user b (uid 1002): 
+     Filesystem  blocks   quota   limit   grace   files   quota   limit   grace
+      /dev/sdb1       0   10000   20000              10      10      20    
+
+> Reached soft limit inode timer for grace period started "7days"
+    
+[b@localhost quotadir]$ touch {11..20}
+sdb1: warning, user file quota exceeded.
+[b@localhost quotadir]$ quota b
+Disk quotas for user b (uid 1002): 
+     Filesystem  blocks   quota   limit   grace   files   quota   limit   grace
+      /dev/sdb1       0   10000   20000              20*     10      20   7days
+[b@localhost quotadir]$ 
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Block
+
+B user block Quota  --> 10MB -20MB
+
+> created 5MB size file 
+
+[b@localhost quotadir]$ dd if=/dev/zero of=/quotadir/buser.txt bs=1M count=5
+5+0 records in
+5+0 records out
+5242880 bytes (5.2 MB, 5.0 MiB) copied, 0.0100838 s, 520 MB/s
+[b@localhost quotadir]$ ls -lh buser.txt 
+-rw-rw-r--. 1 b b 5.0M May 12 10:01 buser.txt
+[b@localhost quotadir]$ 
+
+[b@localhost quotadir]$ dd if=/dev/zero of=/quotadir/buser.txt bs=1M count=50
+sdb1: warning, user block quota exceeded.
+sdb1: write failed, user block limit reached.
+dd: error writing '/quotadir/buser.txt': Disk quota exceeded
+20+0 records in
+19+0 records out
+20480000 bytes (20 MB, 20 MiB) copied, 0.0621235 s, 330 MB/s
+[b@localhost quotadir]$ 
+
+
+7 days of grace for blocks
+
+[b@localhost quotadir]$ quota b
+Disk quotas for user b (uid 1002): 
+     Filesystem  blocks   quota   limit   grace   files   quota   limit   grace
+      /dev/sdb1   20000*  10000   20000   7days       1      10      20        
+[b@localhost quotadir]$
+
+************************************************************************************************************************
