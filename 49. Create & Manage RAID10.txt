@@ -1,0 +1,529 @@
+49. Create & Manage RAID10
+-------------------------------------------------------------------------
+
+
+
+
+                                         RAID 1 + 0
+                                        [ Mirroring + Stripping ]
+                                           |
+					   |
+                    _________________________________________________________________
+		   |		  |				|	            |
+               Block 1          Block 1                      Block 2              Block 2
+               Block 3          Block 3                      Block 4              Block 4
+               Block 5          Block 5                      Block 6              Block 6
+               Block 7          Block 7                      Block 8              Block 8
+               
+              [drive 1]       [drive 2]                    [drive 3]            [drive 4]   
+
+----------------------------------------------------------------------------------------------------------------------------
+
+Minimum ---> 4 disks required
+
+Advantages :-
+
+> any one Disk failed in RAID10 . Rebuilding time is very fast
+
+
+Disadvantages:-
+
+> Storage capacity is half.
+> expensive compare to RAID 5 /RAID 6 [ no parity concept]
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+                                      N= 1011 0101
+                                       
+                                           |
+					   |
+                    _______________________V__________________________________________
+	           |                      RAID 0 [stripping]			      |
+                   |								      |
+                   V								      V
+          ___________________					      _________________________
+          |	RAID1	     |    				     |           RAID1        |
+          V  [Mirroring]     V                                       V         [Mirroring]    V
+       [1011]             [1011]                                  [0101]                    [0101]
+       [    ]             [    ]                                  [    ]                    [    ]
+       [    ]             [    ]                                  [    ]                    [    ]
+       [    ]             [    ]                                  [    ]                    [    ]
+       [    ]             [    ]                                  [    ]                    [    ]
+    
+       Disk1               Disk2                                  Disk3                     Disk4
+       [1TB]               [1TB]                                  [1TB]                     [1TB]
+
+            RAID capacity=2TB
+
+            
+
+SET-A  ----> Disk1 + Disk3 
+
+SET-B  ----> Disk2 + Disk4 
+
+> Incase  anyone disk is  failed  in SET data will be not impact
+
+> If two below disks failed data will be corrupted.
+
+Set-a --> disk1
+set-b --> disk2
+
+=================================================================================================================================
+
+
+RAID 1 0
+===================================================================================================
+
+1.we have created new partition for each disk 
+
+4 X 4G  ------> RAID 10 
+
+type --->fd[ RAID paritition type ]
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0    4G  0 disk 
+└─sda1          8:1    0    4G  0 part 
+sdb             8:16   0    4G  0 disk 
+└─sdb1          8:17   0    4G  0 part 
+sdc             8:32   0    4G  0 disk 
+└─sdc1          8:33   0    4G  0 part 
+sdd             8:48   0    4G  0 disk 
+└─sdd1          8:49   0    4G  0 part 
+sde             8:64   0    4G  0 disk 
+sdf             8:80   0    4G  0 disk
+
+****************************************************************************************
+
+2. Need to configure RAID 10  
+
+[root@localhost ~]# mdadm -C /dev/md0 -l  10 -n 4 /dev/sda1 /dev/sdb1 /dev/sdc1 /dev/sdd1 
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md0 started.
+
+[root@localhost ~]# cat /proc/mdstat 
+Personalities : [raid10] 
+md0 : active raid10 sdd1[3] sdc1[2] sdb1[1] sda1[0]
+      8380416 blocks super 1.2 512K chunks 2 near-copies [4/4] [UUUU]
+      [=====>...............]  resync = 26.2% (2202112/8380416) finish=0.4min speed=220211K/sec
+      
+unused devices: <none>
+[root@localhost ~]#  
+
+*******************************************************************************************************
+
+3. RAID in more details
+
+
+
+Set- A ---> sda1 + sdc1
+
+Set- B ---> sdb1 + sdd1	
+
+[both side two disk fail is Okay
+but  one disk is failed in each set A then it leads data corruption ]
+
+
+[root@localhost ~]# mdadm -D /dev/md0 
+/dev/md0:
+           Version : 1.2
+     Creation Time : Sun May 12 02:25:33 2024
+        Raid Level : raid10
+        Array Size : 8380416 (7.99 GiB 8.58 GB)
+     Used Dev Size : 4190208 (4.00 GiB 4.29 GB)
+      Raid Devices : 4
+     Total Devices : 4
+       Persistence : Superblock is persistent
+
+       Update Time : Sun May 12 02:26:15 2024
+             State : clean 
+    Active Devices : 4
+   Working Devices : 4
+    Failed Devices : 0
+     Spare Devices : 0
+
+            Layout : near=2
+        Chunk Size : 512K
+
+Consistency Policy : resync
+
+              Name : localhost.localdomain:0  (local to host localhost.localdomain)
+              UUID : c70e01db:0c0a941d:d919daad:5a0a1a08
+            Events : 17
+
+    Number   Major   Minor   RaidDevice State
+       0       8        1        0      active sync set-A   /dev/sda1
+       1       8       17        1      active sync set-B   /dev/sdb1
+       2       8       33        2      active sync set-A   /dev/sdc1
+       3       8       49        3      active sync set-B   /dev/sdd1
+[root@localhost ~]# 
+
+***********************************************************************************************
+
+4. Formating RAID 10 to XFS 
+
+[ Note :- we can also configure LVM ]
+
+
+
+[root@localhost ~]# mkfs.xfs /dev/md0 
+log stripe unit (524288 bytes) is too large (maximum is 256KiB)
+log stripe unit adjusted to 32KiB
+meta-data=/dev/md0               isize=512    agcount=8, agsize=261760 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=2094080, imaxpct=25
+         =                       sunit=128    swidth=256 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=8 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE            LABEL                   UUID                                   MOUNTPOINT
+sda                                                                                            
+└─sda1        linux_raid_member localhost.localdomain:0 c70e01db-0c0a-941d-d919-daad5a0a1a08   
+  └─md0       xfs                                       825d02a7-e1cc-4055-996b-fedcfd976d22   
+sdb                                                                                            
+└─sdb1        linux_raid_member localhost.localdomain:0 c70e01db-0c0a-941d-d919-daad5a0a1a08   
+  └─md0       xfs                                       825d02a7-e1cc-4055-996b-fedcfd976d22   
+sdc                                                                                            
+└─sdc1        linux_raid_member localhost.localdomain:0 c70e01db-0c0a-941d-d919-daad5a0a1a08   
+  └─md0       xfs                                       825d02a7-e1cc-4055-996b-fedcfd976d22   
+sdd                                                                                            
+└─sdd1        linux_raid_member localhost.localdomain:0 c70e01db-0c0a-941d-d919-daad5a0a1a08   
+  └─md0       xfs                                       825d02a7-e1cc-4055-996b-fedcfd976d22   
+
+****************************************************************************************************
+
+5. Mounting and storing the data
+
+
+[root@localhost ~]#  mkdir /raid10
+
+[root@localhost ~]# mount /dev/md0 /raid10/
+
+[root@localhost ~]# cd /raid10/
+
+[root@localhost raid10]# touch {100..120}
+
+[root@localhost raid10]# mkdir aa bb cc dd
+
+[root@localhost raid10]# cal > cal.txt
+
+[root@localhost raid10]# ls
+100  101  102  103  104  105  106  107  108  109  110  111  112  113  114  115  116  117  118  119  120  aa  bb  cal.txt  cc  dd
+[root@localhost raid10]# 
+
+********************************************************************************************************************
+
+
+6. Failing disk sda1 disk  ---> set - A
+
+
+    Number   Major   Minor   RaidDevice State
+       0       8        1        0      active sync set-A   /dev/sda1
+       1       8       17        1      active sync set-B   /dev/sdb1
+       2       8       33        2      active sync set-A   /dev/sdc1
+       3       8       49        3      active sync set-B   /dev/sdd1
+[root@localhost raid10]# 
+
+
+[root@localhost raid10]# mdadm  /dev/md0 -f /dev/sda1 
+mdadm: set /dev/sda1 faulty in /dev/md0
+
+
+showing faulty 
+
+    Number   Major   Minor   RaidDevice State
+       -       0        0        0      removed
+       1       8       17        1      active sync set-B   /dev/sdb1
+       2       8       33        2      active sync set-A   /dev/sdc1
+       3       8       49        3      active sync set-B   /dev/sdd1
+
+       0       8        1        -      faulty   /dev/sda1
+[root@localhost raid10]# 
+
+*************************************************************************************************************************
+
+7.  Failing another disk sdc1 disk ----> set -A
+
+
+[root@localhost raid10]# mdadm /dev/md0 -f  /dev/sdc1 
+mdadm: set /dev/sdc1 faulty in /dev/md0
+[root@localhost raid10]#
+
+
+   Number   Major   Minor   RaidDevice State
+       -       0        0        0      removed
+       1       8       17        1      active sync set-B   /dev/sdb1
+       -       0        0        2      removed
+       3       8       49        3      active sync set-B   /dev/sdd1
+
+       0       8        1        -      faulty   /dev/sda1
+       2       8       33        -      faulty   /dev/sdc1
+[root@localhost raid10]# 
+
+********************************************************************************************************************************
+
+8. System not make disk fault
+
+[ mirroring ---> SET-A is removed ]
+
+[ If  SET-B any one disk failed physically . It will leads data corruption ]
+
+
+[root@localhost raid10]# mdadm /dev/md0 -f  /dev/sdb1 
+mdadm: set device faulty failed for /dev/sdb1:  Device or resource busy
+[root@localhost raid10]# 
+
+***************************************************************************************************************************************
+
+Solution :-
+
+9.  Replacing faulty disk with new disk
+
+sde , sdf ---> new disk same size 
+
+
+[root@localhost raid10]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE   MOUNTPOINT
+sda             8:0    0    4G  0 disk   
+└─sda1          8:1    0    4G  0 part   
+  └─md0         9:0    0    8G  0 raid10 /raid10
+sdb             8:16   0    4G  0 disk   
+└─sdb1          8:17   0    4G  0 part   
+  └─md0         9:0    0    8G  0 raid10 /raid10
+sdc             8:32   0    4G  0 disk   
+└─sdc1          8:33   0    4G  0 part   
+  └─md0         9:0    0    8G  0 raid10 /raid10
+sdd             8:48   0    4G  0 disk   
+└─sdd1          8:49   0    4G  0 part   
+  └─md0         9:0    0    8G  0 raid10 /raid10
+sde             8:64   0    4G  0 disk   
+└─sde1          8:65   0    4G  0 part   
+sdf             8:80   0    4G  0 disk   
+└─sdf1          8:81   0    4G  0 part   
+
+***********************************************************************************************************************************
+
+10. Removing faulty disk ---> sda1 , sdc11
+
+
+
+    Number   Major   Minor   RaidDevice State
+       -       0        0        0      removed
+       1       8       17        1      active sync set-B   /dev/sdb1
+       -       0        0        2      removed
+       3       8       49        3      active sync set-B   /dev/sdd1
+
+       0       8        1        -      faulty   /dev/sda1
+       2       8       33        -      faulty   /dev/sdc1
+[root@localhost raid10]# 
+
+
+
+[root@localhost raid10]# mdadm /dev/md0 -r /dev/sda1  /dev/sdc1 
+mdadm: hot removed /dev/sda1 from /dev/md0
+mdadm: hot removed /dev/sdc1 from /dev/md0
+[root@localhost raid10]# 
+
+
+   Number   Major   Minor   RaidDevice State
+       -       0        0        0      removed
+       1       8       17        1      active sync set-B   /dev/sdb1
+       -       0        0        2      removed
+       3       8       49        3      active sync set-B   /dev/sdd1
+[root@localhost raid10]# 
+
+***************************************************************************************************************************************
+
+11. Adding new disk to the RAID10 
+
+
+[root@localhost raid10]# mdadm /dev/md0 -a /dev/sde1  /dev/sdf1 
+mdadm: added /dev/sde1
+mdadm: added /dev/sdf1
+[root@localhost raid10]#
+
+[root@localhost raid10]# cat /proc/mdstat 
+Personalities : [raid10] 
+md0 : active raid10 sdf1[5] sde1[4] sdd1[3] sdb1[1]
+      8380416 blocks super 1.2 512K chunks 2 near-copies [4/4] [UUUU]
+      
+unused devices: <none>
+[root@localhost raid10]# 
+
+
+
+Now all are active configuration looks good
+
+    Number   Major   Minor   RaidDevice State
+       5       8       81        0      active sync set-A   /dev/sdf1
+       1       8       17        1      active sync set-B   /dev/sdb1
+       4       8       65        2      active sync set-A   /dev/sde1
+       3       8       49        3      active sync set-B   /dev/sdd1
+[root@localhost raid10]#
+
+***************************************************************************************************************************************************
+
+
+=================================================================================================================
+
+Create RAID 10 again on LVM
+
+==========================================================================================================
+
+
+Follow the steps  1 -3 above 
+
+
+1. unmount the FS and create physical volume
+
+[root@localhost ~]# pvcreate /dev/md0 
+WARNING: xfs signature detected on /dev/md0 at offset 0. Wipe it? [y/n]: y
+  Wiping xfs signature on /dev/md0.
+  Physical volume "/dev/md0" successfully created.
+[root@localhost ~]# 
+
+******************************************************************************************
+
+2. Volume Group create
+
+
+[root@localhost ~]# vgcreate linuxvg /dev/md0 
+  Volume group "linuxvg" successfully created
+[root@localhost ~]# vgs
+  VG      #PV #LV #SN Attr   VSize   VFree 
+  linuxvg   1   0   0 wz--n-  <7.99g <7.99g
+  rhel      1   2   0 wz--n- <29.00g     0 
+[root@localhost ~]#
+
+********************************************************************************************
+
+3.Created Logical Volume
+
+[root@localhost ~]# lvcreate  -L 2G -n linuxlv linuxvg
+  Logical volume "linuxlv" created.
+
+[root@localhost ~]# lvcreate -L 2G -n linlv linuxvg 
+  Logical volume "linlv" created.
+[root@localhost ~]# lvs
+  LV      VG      Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  linlv   linuxvg -wi-a-----   2.00g                                                    
+  linuxlv linuxvg -wi-a-----   2.00g                                                    
+  root    rhel    -wi-ao---- <26.00g                                                    
+  swap    rhel    -wi-ao----   3.00g                                                    
+[root@localhost ~]# 
+
+************************************************************************************************************
+
+4. checking current details
+
+
+[root@localhost ~]# lsblk
+NAME                  MAJ:MIN RM  SIZE RO TYPE   MOUNTPOINT
+sda                     8:0    0    4G  0 disk   
+└─sda1                  8:1    0    4G  0 part   
+sdb                     8:16   0    4G  0 disk   
+└─sdb1                  8:17   0    4G  0 part   
+  └─md0                 9:0    0    8G  0 raid10 
+    ├─linuxvg-linuxlv 253:2    0    2G  0 lvm    
+    └─linuxvg-linlv   253:3    0    2G  0 lvm    
+sdc                     8:32   0    4G  0 disk   
+└─sdc1                  8:33   0    4G  0 part   
+sdd                     8:48   0    4G  0 disk   
+└─sdd1                  8:49   0    4G  0 part   
+  └─md0                 9:0    0    8G  0 raid10 
+    ├─linuxvg-linuxlv 253:2    0    2G  0 lvm    
+    └─linuxvg-linlv   253:3    0    2G  0 lvm    
+sde                     8:64   0    4G  0 disk   
+└─sde1                  8:65   0    4G  0 part   
+  └─md0                 9:0    0    8G  0 raid10 
+    ├─linuxvg-linuxlv 253:2    0    2G  0 lvm    
+    └─linuxvg-linlv   253:3    0    2G  0 lvm    
+sdf                     8:80   0    4G  0 disk   
+└─sdf1                  8:81   0    4G  0 part   
+  └─md0                 9:0    0    8G  0 raid10 
+    ├─linuxvg-linuxlv 253:2    0    2G  0 lvm    
+    └─linuxvg-linlv   253:3    0    2G  0 lvm  
+
+***************************************************************************************************************
+
+5. creating RAID  again on both linuxlv and linlv
+
+
+
+[root@localhost ~]# mdadm -C /dev/md1 -l 1  -n 2 /dev/linuxvg/linlv  /dev/linuxvg/linuxlv 
+mdadm: Note: this array has metadata at the start and
+    may not be suitable as a boot device.  If you plan to
+    store '/boot' on this device please ensure that
+    your boot-loader understands md/v1.x metadata, or use
+    --metadata=0.90
+Continue creating array? y
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md1 started.
+[root@localhost ~]# 
+
+***********************************************************************************************************************
+
+6. created RAID on LVM again
+
+
+
+[root@localhost ~]# mdadm -D  /dev/md1 
+/dev/md1:
+           Version : 1.2
+     Creation Time : Sun May 12 03:11:20 2024
+        Raid Level : raid1
+        Array Size : 2094080 (2045.00 MiB 2144.34 MB)
+     Used Dev Size : 2094080 (2045.00 MiB 2144.34 MB)
+      Raid Devices : 2
+     Total Devices : 2
+       Persistence : Superblock is persistent
+
+       Update Time : Sun May 12 03:11:31 2024
+             State : clean 
+    Active Devices : 2
+   Working Devices : 2
+    Failed Devices : 0
+     Spare Devices : 0
+
+Consistency Policy : resync
+
+              Name : localhost.localdomain:1  (local to host localhost.localdomain)
+              UUID : 2bfa6020:cadacb53:556370dc:de9ffd94
+            Events : 17
+
+    Number   Major   Minor   RaidDevice State
+       0     253        3        0      active sync   /dev/dm-3
+       1     253        2        1      active sync   /dev/dm-2
+[root@localhost ~]# 
+
+**********************************************************************************************************
+
+7. formatted xfs and mounted the FS 
+
+[root@localhost ~]# mkfs.xfs /dev/md1 
+log stripe unit (524288 bytes) is too large (maximum is 256KiB)
+log stripe unit adjusted to 32KiB
+meta-data=/dev/md1               isize=512    agcount=8, agsize=65408 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=523264, imaxpct=25
+         =                       sunit=128    swidth=256 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=8 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost ~]# mount /dev/md1  /raid1
+[root@localhost ~]# df -hTP /raid1
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/md1       xfs   2.0G   47M  2.0G   3% /raid1
+[root@localhost ~]# 
+
+*****************************************************************************************************************
+
+
