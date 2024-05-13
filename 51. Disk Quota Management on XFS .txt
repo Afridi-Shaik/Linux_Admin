@@ -1,0 +1,674 @@
+51. Disk Quota Management on XFS 
+
+*********************************************************************************************
+
+
+In XFS -----> Grace Period  called Timer
+
+=====================================================
+
+
+===============================================================================================================
+
+1. Created Partitions in sda disk 
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   10G  0 disk 
+└─sda1          8:1    0   10G  0 part 
+sr0            11:0    1 1024M  0 rom  
+nvme0n1       259:0    0   30G  0 disk 
+├─nvme0n1p1   259:1    0    1G  0 part /boot
+└─nvme0n1p2   259:2    0   29G  0 part 
+  ├─rhel-root 253:0    0   26G  0 lvm  /
+  └─rhel-swap 253:1    0    3G  0 lvm  [SWAP]
+[root@localhost ~]#
+
+*********************************************************************************
+
+2. Format FS into XFS and mount in fstab permanenetly
+
+
+[root@localhost ~]# mkfs.xfs /dev/sda1 
+meta-data=/dev/sda1              isize=512    agcount=4, agsize=655296 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=2621184, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+└─sda1        xfs               41608d43-3f45-4898-bdfc-b64afa83b0cd   
+
+
+[root@localhost ~]# cat /etc/fstab | grep xquota
+/dev/sda                /xquota                 xfs     defaults        0 0
+[root@localhost ~]# 
+
+
+[root@localhost ~]# df -hTP /xquota/
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sda1      xfs    10G  104M  9.9G   2% /xquota
+[root@localhost ~]# 
+
+***********************************************************************************************
+
+3. Enable  Quota by making entry in fstab [permanently ]  
+
+uquota ---> user quota
+gquota ---> group quota
+prjquota ---> 
+
+
+[root@localhost ~]# cat /etc/fstab | grep xquota
+/dev/sda1                /xquota                 xfs     defaults,uquota,gquota,prjquota        0 0
+[root@localhost ~]# 
+
+
+[root@localhost ~]# umount /xquota 
+
+[root@localhost ~]# mount -a
+
+
+Applied Quota
+
+[root@localhost ~]# mount | grep /xquota
+/dev/sda1 on /xquota type xfs (rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,usrquota,prjquota,grpquota)
+[root@localhost ~]#
+
+*************************************************************************************************
+
+4. Created user and group
+
+
+[root@localhost ~]# chmod 777 /xquota/
+[root@localhost ~]# useradd Deepak
+
+[root@localhost ~]# groupadd admin
+
+[root@localhost ~]# cat /etc/group | grep admin
+printadmin:x:994:
+admin:x:1007:
+[root@localhost ~]#
+
+************************************************************************************************************
+
+5. We can user xfs_quota utility for defining
+
+
+[root@localhost ~]# xfs_quota 
+xfs_quota> help
+df [-bir] [-hN] [-f file] -- show free and used counts for blocks and inodes
+help [command] -- help for one or all commands
+print -- list known mount points and projects
+quit -- exit the program
+quota [-bir] [-g|-p|-u] [-hnNv] [-f file] [id|name]... -- show usage and limits
+
+Use 'help commandname' for extended help.
+xfs_quota> df
+Filesystem           1K-blocks       Used  Available  Use% Pathname
+/dev/mapper/rhel-root
+                      27245572    7066760   20178812   26% /
+/dev/nvme0n1p1         1038336     247724     790612   24% /boot
+/dev/sda1             10474496     106088   10368408    1% /xquota
+xfs_quota> quit
+[root@localhost ~]# 
+
+****************************************************************************************************************
+
+6. Creating  Block Limit
+
+bsoft ---> soft limit
+bhard ---> hard limit
+
+
+
+[root@localhost ~]# xfs_quota -x -c 'limit bsoft=1g bhard=1536m deepak' /xquota/
+
+[root@localhost ~]# xfs_quota -x -c report /xquota/
+User quota on /xquota (/dev/sda1)
+                               Blocks                     
+User ID          Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+root                0          0          0     00 [--------]
+deepak              0    1048576    1572864     00 [--------]
+
+Group quota on /xquota (/dev/sda1)
+                               Blocks                     
+Group ID         Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+root                0          0          0     00 [--------]
+
+Project quota on /xquota (/dev/sda1)
+                               Blocks                     
+Project ID       Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+#0                  0          0          0     00 [--------]
+
+[root@localhost ~]# 
+
+*******************************************************************************************************************************
+
+7.we have reached softlimit & Grace Period timer started 
+
+
+
+
+[root@localhost ~]# su - deepak 
+[deepak@localhost ~]$ cd /xquota/
+[deepak@localhost xquota]$ fal
+fallocate  false      
+[deepak@localhost xquota]$ fallocate -l 1.2G /xquota/test_file_1.2G
+[deepak@localhost xquota]$ ls -lh test_file_1.2G 
+-rw-rw-r--. 1 deepak deepak 1.2G May 13 00:55 test_file_1.2G
+[deepak@localhost xquota]$ 
+
+
+
+User quota on /xquota (/dev/sda1)
+                               Blocks                     
+User ID          Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+root                0          0          0     00 [--------]
+deepak        1253376    1048576    1572864     00  [6 days]
+
+Group quota on /xquota (/dev/sda1)
+                               Blocks                     
+Group ID         Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+root                0          0          0     00 [--------]
+deepak        1253376          0          0     00 [--------]
+
+Project quota on /xquota (/dev/sda1)
+                               Blocks                     
+Project ID       Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+#0            1253376          0          0     00 [--------]
+
+[root@localhost ~]# 
+
+
+********************************************************************************************
+
+8. Hard limit is reached so it created empty file
+
+[deepak@localhost xquota]$ fallocate -l 1.7G /xquota/test_file_1.7G
+fallocate: fallocate failed: Disk quota exceeded
+
+[deepak@localhost xquota]$ ls -lh test_file_1.7G 
+-rw-rw-r--. 1 deepak deepak 0 May 13 00:58 test_file_1.7G
+[deepak@localhost xquota]$ 
+
+*********************************************************************************************************
+
+9. configuring Inode LImit in XFS for Deepak user
+
+
+[root@localhost ~]# xfs_quota -x -c 'limit isoft=10 ihard=15 deepak' /xquota/
+
+
+[root@localhost ~]# xfs_quota -x -c "report -bih" /xquota/
+User quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+User ID      Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0     1G   1.5G  00 [------]      1     10     15  00 [------]
+
+Group quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Group ID     Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0      0      0  00 [------]      1      0      0  00 [------]
+
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]      4      0      0  00 [------]
+
+[root@localhost ~]# 
+
+
+*******************************************************************************************************
+
+10.  Reached inode limit Grace Period
+
+
+[deepak@localhost xquota]$ touch {1..10}
+[deepak@localhost xquota]$ touch {12..17}
+touch: cannot touch '17': Disk quota exceeded
+[deepak@localhost xquota]$ 
+
+
+[root@localhost ~]# xfs_quota -x -c "report -bih" /xquota/
+User quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+User ID      Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0     1G   1.5G  00 [------]     15     10     15  00 [6 days]
+
+Group quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Group ID     Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0      0      0  00 [------]     15      0      0  00 [------]
+
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]     18      0      0  00 [------]
+
+[root@localhost ~]# 
+
+****************************************************************************************************
+
+
+
+Shortcuts :-
+
+1. How to define both block and inode  & also define user and group
+
+Syntax :-
+
+xfs_quota -x -c 'userlimit' 'grouplimit'  [FS]
+
+[root@localhost ~]# xfs_quota -x -c 'limit -u bsoft=500M bhard=800M deepak' -c 'limit -g bsoft=600M bhard=900M admin' /xquota/
+[root@localhost ~]# 
+
+
+Both Group and user inodes are defined 
+
+[root@localhost ~]# xfs_quota -x -c "report -bih" /xquota/
+User quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+User ID      Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0   500M   800M  00 [------]     15     10     15  00 [------]
+
+Group quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Group ID     Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0      0      0  00 [------]     15      0      0  00 [------]
+admin           0   600M   900M  00 [------]      0      0      0  00 [------]
+
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]     18      0      0  00 [------]
+
+[root@localhost ~]# 
+
+*****************************************************************************************************************
+
+2. Define same quota having group for user
+
+
+[root@localhost ~]# useradd testuser
+
+[root@localhost ~]# usermod -G admin testuser 
+
+
+
+[root@localhost ~]# id testuser
+uid=1006(testuser) gid=1007(admin) groups=1007(admin)
+[root@localhost ~]# 
+
+
+[root@localhost ~]# cat /etc/group | grep testuser
+admin:x:1007:testuser
+testuser:x:1008:
+[root@localhost ~]# 
+
+
+
+[testuser@localhost ~]$ cd /xquota/
+[testuser@localhost xquota]$ touch test{1..10}
+[testuser@localhost xquota]$ exit
+logout
+[root@localhost ~]# xfs_quota -x -c "report -bih" /xquota/
+User quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+User ID      Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0   500M   800M  00 [------]     15     10     15  00 [------]
+testuser        0      0      0  00 [------]     10      0      0  00 [------]
+
+Group quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Group ID     Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+root            0      0      0  00 [------]      3      0      0  00 [------]
+deepak          0      0      0  00 [------]     15      0      0  00 [------]
+admin           0   600M   900M  00 [------]     10      0      0  00 [------]
+
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]     28      0      0  00 [------]
+
+[root@localhost ~]# 
+
+
+**********************************************************************************************************
+
+
+3. Project Quota ---> directory we can make limits
+
+
+
+i. Defining project id in ----> /etc/projid
+
+[projectname]:[projid]
+
+
+[root@localhost ~]# echo testquota:11 >> /etc/projid
+[root@localhost ~]# cat /etc/projid 
+testquota:11
+
+ii.Defining Project id with Directory name
+
+[projid]:[dir path]
+
+[root@localhost ~]# echo 11:/xquota >> /etc/projects
+[root@localhost ~]# cat /etc/projects 
+11:/xquota
+[root@localhost ~]# 
+
+
+
+iii. Configuration of project quota
+
+Syntax:-
+
+xfs_quota -x -c 'project -s projectname' project_path
+
+
+[root@localhost ~]# xfs_quota -x -c 'project -s testquota' /xquota/
+Setting up project testquota (path /xquota)...
+Processed 1 (/etc/projects and cmdline) paths for project testquota with recursion depth infinite (-1).
+
+
+
+iv. testquota project configured
+
+[root@localhost ~]# xfs_quota -x -c "print" /xquota/
+Filesystem          Pathname
+/xquota             /dev/sda1 (uquota, gquota, pquota)
+/xquota             /dev/sda1 (project 11, testquota)
+[root@localhost ~]# 
+
+
+v. to get more details "-p" parameter can be used
+
+[root@localhost ~]# xfs_quota -x -c "report -pbih" /xquota/
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]      2      0      0  00 [------]
+testquota       0      0      0  00 [------]     26      0      0  00 [------]
+
+[root@localhost ~]# 
+
+vi. defining limit 
+
+
+block limit
+-------------------------------------------------------------------------------
+
+[root@localhost ~]# xfs_quota -x -c 'limit -p bsoft=200m bhard=300m testquota' /xquota/
+[root@localhost ~]# xfs_quota -x -c "report -pbih" /xquota/
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]      2      0      0  00 [------]
+testquota       0   200M   300M  00 [------]     26      0      0  00 [------]
+
+[root@localhost ~]# 
+
+
+inode limit
+-----------------------------------------------------------------------------------
+[root@localhost ~]# xfs_quota -x -c 'limit -p isoft=200m ihard=300m testquota' /xquota/
+[root@localhost ~]# xfs_quota -x -c "report -pbih" /xquota/
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]      2      0      0  00 [------]
+testquota       0   200M   300M  00 [------]     26    200    300  00 [------]
+
+[root@localhost ~]# 
+
+
+
+vii. testing
+
+we have created limit that we have reached. for the directory
+
+[root@localhost ~]# dd if=/dev/urandom of=/xquota/test_file
+dd: writing to '/xquota/test_file': No space left on device
+614401+0 records in
+614400+0 records out
+314572800 bytes (315 MB, 300 MiB) copied, 4.83728 s, 65.0 MB/s
+[root@localhost ~]
+
+Grace period also started
+
+[root@localhost ~]# xfs_quota -x -c "report -pbih" /xquota/
+Project quota on /xquota (/dev/sda1)
+                        Blocks                            Inodes              
+Project ID   Used   Soft   Hard Warn/Grace     Used   Soft   Hard Warn/Grace  
+---------- --------------------------------- --------------------------------- 
+#0              0      0      0  00 [------]      2      0      0  00 [------]
+testquota    300M   200M   300M  00 [6 days]     27    200    300  00 [------]
+
+[root@localhost ~]# 
+
+
+**********************************************************************************************************************
+
+4. to check the FS state in quota
+
+[root@localhost ~]# xfs_quota  -x -c "state" /xquota/
+User quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #131 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+Group quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #132 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+Project quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #133 (1 blocks, 1 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]#
+
+****************************************************************************************
+
+
+5. Change Timer
+
+Block Timer 
+--------------------------------------------------
+[root@localhost ~]# xfs_quota -x -c 'timer -p -b 10days' /xquota/
+
+
+[root@localhost ~]# xfs_quota  -x -c "state -p" /xquota/
+Project quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #133 (1 blocks, 1 extents)
+Blocks grace time: [10 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]# 
+
+
+
+Inode timer
+---------------------------------------------
+
+[root@localhost ~]# xfs_quota -x -c 'timer -p -i 10days' /xquota/
+[root@localhost ~]# xfs_quota  -x -c "state -p" /xquota/
+Project quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #133 (1 blocks, 1 extents)
+Blocks grace time: [10 days]
+Blocks max warnings: 5
+Inodes grace time: [10 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]#
+
+*****************************************************************************************************
+
+6. Disable Quota  ---> Temporary
+
+[ Enforcement will be off ]
+
+
+User Quota disable  ----> limits are removed  for user
+-------------------------------------------------
+
+[root@localhost ~]# xfs_quota  -x  -c "disable -uv" /xquota/
+User quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: OFF
+  Inode: #131 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]# 
+
+Project Quota disable ---> limits are removed for Project
+---------------------------------------------------------------
+
+[root@localhost ~]# xfs_quota  -x  -c "disable -pv" /xquota/
+Project quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: OFF
+  Inode: #133 (1 blocks, 1 extents)
+Blocks grace time: [10 days]
+Blocks max warnings: 5
+Inodes grace time: [10 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]#
+
+Group Quota disable ----> limits are removed for group
+-------------------------------------------------------------------
+[root@localhost ~]# xfs_quota  -x  -c "disable -gv" /xquota/
+Group quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: OFF
+  Inode: #132 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]# 
+
+
+***************************************************************************************
+
+7.  Enable quota
+
+
+[root@localhost ~]# xfs_quota  -x  -c "enable -ugpv" /xquota/
+User quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #131 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+Group quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #132 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+Project quota state on /xquota (/dev/sda1)
+  Accounting: ON
+  Enforcement: ON
+  Inode: #133 (1 blocks, 1 extents)
+Blocks grace time: [10 days]
+Blocks max warnings: 5
+Inodes grace time: [10 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]# 
+
+**************************************************************************************************
+
+8. Permanent Disable Quota
+
+[Both Accounting, Enforcement is Off]
+
+[root@localhost ~]# xfs_quota  -x  -c "off -uv" /xquota/
+User quota state on /xquota (/dev/sda1)
+  Accounting: OFF
+  Enforcement: OFF
+  Inode: #131 (2 blocks, 2 extents)
+Blocks grace time: [7 days]
+Blocks max warnings: 5
+Inodes grace time: [7 days]
+Inodes max warnings: 5
+Realtime Blocks grace time: [7 days]
+[root@localhost ~]# 
+
+usrquota is removed
+
+[root@localhost ~]# mount | grep xquota
+/dev/sda1 on /xquota type xfs (rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,prjquota,grpquota)
+[root@localhost ~]# 
+
+
+we can remove group and project quota also with above commands
+********************************************************************************************************
+
