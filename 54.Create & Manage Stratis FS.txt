@@ -1,0 +1,406 @@
+Create & Manage Stratis FS [ Stratis  Layered Storage]
+
+**************************************************************************************************************************
+
+Stratis ---> Rhel8+ ---> By default uses  xfs --->[LVM thin provisioned, FS snapshot, FS tiering , Pool based storage management, FS monitoring ]
+
+It's tool ----> we can enhance storage functionality
+
+Dameon ---> It's service after server poweron and it  started running until server power off.
+
+**********************************************************************************************************************************
+
+
+Pre - Requisites:-
+
+stratisd ,stratis-cli --> Both packages needs to be installed
+
+
+
+1. Enable service during reboot
+
+
+[root@localhost ~]# systemctl enable --now stratisd
+[root@localhost ~]# systemctl status stratisd
+● stratisd.service - Stratis daemon
+   Loaded: loaded (/usr/lib/systemd/system/stratisd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2024-05-27 20:48:10 EDT; 14s ago
+     Docs: man:stratisd(8)
+ Main PID: 40563 (stratisd)
+    Tasks: 8 (limit: 10871)
+   Memory: 9.0M
+   CGroup: /system.slice/stratisd.service
+           └─40563 /usr/libexec/stratisd --log-level debug
+
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z DEBUG libstratis::stratis::run] 2: thread started
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z INFO  libstratis::stratis::run] stratis daemon version 2.4.2 started
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z INFO  libstratis::stratis::run] Using StratEngine
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z DEBUG libstratis::stratis::run] 3: thread started
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z INFO  libstratis::engine::strat_engine::liminal::identify] Beginning initial search for Stratis block devices
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z DEBUG libstratis::stratis::run] 4: thread started
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z DEBUG libstratis::stratis::run] 5: thread started
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z INFO  libstratis::stratis::ipc_support::dbus_support] D-Bus API is available
+May 27 20:48:10 localhost.localdomain stratisd[40563]: [2024-05-28T00:48:10Z DEBUG libstratis::stratis::run] 6: thread started
+May 27 20:48:10 localhost.localdomain systemd[1]: Started Stratis daemon.
+[root@localhost ~]# 
+
+
+2.  6 X 5G scsi disk
+
+
+[root@localhost ~]# lsblk
+NAME          MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   5G  0 disk 
+sdb             8:16   0   5G  0 disk 
+sdc             8:32   0   5G  0 disk 
+sdd             8:48   0   5G  0 disk 
+sde             8:64   0   5G  0 disk 
+sdf             8:80   0   5G  0 disk 
+nvme0n1       259:0    0  30G  0 disk 
+├─nvme0n1p1   259:1    0   1G  0 part /boot
+└─nvme0n1p2   259:2    0  29G  0 part 
+  ├─rhel-root 253:0    0  26G  0 lvm  /
+  └─rhel-swap 253:1    0   3G  0 lvm  [SWAP]
+[root@localhost ~]# 
+
+
+3. It doesn't have data or fs type anything while using startis fs. 
+
+[root@localhost ~]# blkid -p /dev/sdb
+[root@localhost ~]# 
+
+
+[root@localhost ~]# lsblk -f
+NAME          FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                    
+sdb                                                                    
+sdc                                                                    
+sdd                                                                    
+sde                                                                    
+sdf                                                                    
+
+[ If you have already having some fs type Use below steps
+
+
+[root@localhost ~]# mkfs.ext4 /dev/sdb
+mke2fs 1.45.6 (20-Mar-2020)
+Creating filesystem with 1310720 4k blocks and 327680 inodes
+Filesystem UUID: 348dd9e6-dd4e-4282-b12b-e1380ea29ede
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+[root@localhost ~]# blkid -p /dev/sdb
+/dev/sdb: UUID="348dd9e6-dd4e-4282-b12b-e1380ea29ede" VERSION="1.0" BLOCK_SIZE="4096" TYPE="ext4" USAGE="filesystem"
+[root@localhost ~]# wipefs -a /dev/sdb
+/dev/sdb: 2 bytes were erased at offset 0x00000438 (ext4): 53 ef
+[root@localhost ~]# blkid -p /dev/sdb
+[root@localhost ~]# 
+
+]
+
+
+******************************************************************************************************************************
+Implementation
+================================================================================================================================================================
+
+
+1. Creating pool on /dev/sdb
+
+Syntax :- 
+
+stratis pool create [pool_name] [disk_path]
+
+[root@localhost ~]# stratis pool create my_pool_1 /dev/sdb 
+[root@localhost ~]# lsblk -f
+NAME                                                                    FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                                                                              
+sdb                                                                     stratis           a26c4d57434b48a3a99f09ae7af1c44e       
+└─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-physical-originsub                                                          
+  ├─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-thinmeta                                                             
+  │ └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-thinpool-pool                                                           
+  ├─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-thindata                                                             
+  │ └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-thinpool-pool                                                           
+  └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-mdv                                                                  
+sdc                                                                                                                              
+sdd                                                                                                                              
+sde                                                                                                                              
+sdf                                                                                                                              
+nvme0n1                                                                                                                          
+├─nvme0n1p1                                                             xfs               56cad9d4-5f7a-485e-82d8-167c69e5df2d   /boot
+└─nvme0n1p2                                                             LVM2_member       dABhiJ-ok8J-sz3b-O0ug-e6Oo-eoAy-4gEneB 
+  ├─rhel-root                                                           xfs               f05892e1-5861-43e0-9673-7a6919be6874   /
+  └─rhel-swap                                                           swap              3633ed8b-1180-47d3-bf9b-b584302c8202   [SWAP]
+[root@localhost ~]# 
+
+
+******************************************************************************************************************************************************
+
+
+2. Check pool details
+
+[root@localhost ~]# stratis pool list
+Name                      Total Physical   Properties                                   UUID
+my_pool_1   5 GiB / 37.63 MiB / 4.96 GiB      ~Ca,~Cr   9cc55a58-8142-46e6-a44b-413b70ae0d54
+[root@localhost ~]# 
+
+
+*******************************************************************************************************************************************************
+
+3. Creating another pool [/dev/sdc; sdd; sde]
+
+
+[root@localhost ~]# stratis pool create my_pool_2 /dev/sdc /dev/sdd /dev/sde
+[root@localhost ~]# stratis pool list
+\Name                        Total Physical   Properties                                   UUID
+my_pool_1     5 GiB / 37.63 MiB / 4.96 GiB      ~Ca,~Cr   9cc55a58-8142-46e6-a44b-413b70ae0d54
+my_pool_2   15 GiB / 45.63 MiB / 14.96 GiB      ~Ca,~Cr   06d677dd-145a-4fa8-91b2-930b531f8585
+[root@localhost ~]# 
+
+
+********************************************************************************************************************************************
+
+4. Creating FS
+
+[ By default it taking xfs type]
+
+
+[root@localhost ~]# stratis fs create my_pool_1 filesystem-1
+[root@localhost ~]# lsblk -f
+NAME                                                                                        FSTYPE      LABEL UUID                                   MOUNTPOINT
+sda                                                                                                                                                  
+sdb                                                                                         stratis           a26c4d57434b48a3a99f09ae7af1c44e       
+└─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-physical-originsub                                                                              
+  ├─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-thinmeta                                                                                 
+  │ └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-thinpool-pool                                                                               
+  │   └─stratis-1-9cc55a58814246e6a44b413b70ae0d54-thin-fs-f4844b5ab2224575a12b6ecb6bc584b5 xfs               f4844b5a-b222-4575-a12b-6ecb6bc584b5   
+  ├─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-thindata                                                                                 
+  │ └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-thinpool-pool                                                                               
+  │   └─stratis-1-9cc55a58814246e6a44b413b70ae0d54-thin-fs-f4844b5ab2224575a12b6ecb6bc584b5 xfs               f4844b5a-b222-4575-a12b-6ecb6bc584b5   
+  └─stratis-1-private-9cc55a58814246e6a44b413b70ae0d54-flex-mdv     
+
+
+
+[root@localhost ~]# stratis fs list
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_1   filesystem-1   546 MiB   May 27 2024 21:08   /dev/stratis/my_pool_1/filesystem-1   f4844b5a-b222-4575-a12b-6ecb6bc584b5
+[root@localhost ~]#   
+
+***************************************************************************************************************************************************  
+
+
+5.  Mounting the FS
+
+
+[root@localhost ~]# mkdir /data
+[root@localhost ~]# mount /dev/stratis/my_pool_1/filesystem-1  /data/
+[root@localhost ~]# df -hTP | grep data
+/dev/mapper/stratis-1-9cc55a58814246e6a44b413b70ae0d54-thin-fs-f4844b5ab2224575a12b6ecb6bc584b5 xfs       1.0T  7.2G 1017G   1% /data
+[root@localhost ~]#                                                                        
+
+FS tab entry
+[root@localhost ~]# cat /etc/fstab | grep data
+/dev/stratis/my_pool_1/filesystem-1            /data   xfs       defaults  0 0
+
+[ Verification:-
+
+[root@localhost ~]# umount /data
+[root@localhost ~]# cat /etc/fstab | grep data
+/dev/stratis/my_pool_1/filesystem-1            /data   xfs       defaults  0 0
+[root@localhost ~]# mount -a
+mount: swap: mount point does not exist.
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@localhost ~]# df -hTP /data
+Filesystem                                                                                      Type  Size  Used Avail Use% Mounted on
+/dev/mapper/stratis-1-9cc55a58814246e6a44b413b70ae0d54-thin-fs-f4844b5ab2224575a12b6ecb6bc584b5 xfs   1.0T  7.2G 1017G   1% /data
+[root@localhost ~]#
+
+]
+
+***************************************************************************************************************************
+
+6. Creating  another FS from pool_2 & Mounting FS
+
+
+[root@localhost ~]# stratis fs list
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_1   filesystem-1   546 MiB   May 27 2024 21:08   /dev/stratis/my_pool_1/filesystem-1   f4844b5a-b222-4575-a12b-6ecb6bc584b5
+[root@localhost ~]# stratis fs create my_pool_2 filesystem-2
+[root@localhost ~]# stratis fs list
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_1   filesystem-1   546 MiB   May 27 2024 21:08   /dev/stratis/my_pool_1/filesystem-1   f4844b5a-b222-4575-a12b-6ecb6bc584b5
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+[root@localhost ~]# mkdir /block
+[root@localhost ~]# mount /dev/stratis/my_pool_2/filesystem-2 /block/
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@localhost ~]# df -hTP | grep stratis
+tmpfs                                                                                           tmpfs     1.0M     0  1.0M   0% /run/stratisd/keyfiles
+/dev/mapper/stratis-1-9cc55a58814246e6a44b413b70ae0d54-thin-fs-f4844b5ab2224575a12b6ecb6bc584b5 xfs       1.0T  7.2G 1017G   1% /data
+/dev/mapper/stratis-1-06d677dd145a4fa891b2930b531f8585-thin-fs-df270e6c38c1445b8186ccf22ad9ec0e xfs       1.0T  7.2G 1017G   1% /block
+[root@localhost ~]# 
+
+
+**************************************************************************************************************************
+
+7.  FS removal
+
+[root@localhost ~]# umount /data
+[root@localhost ~]# stratis filesystem destroy  my_pool_1  filesystem-1 
+[root@localhost ~]# stratis fs list
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+[root@localhost ~]# 
+
+************************************************************************************************************************************
+
+8. to add additional disk 
+
+[root@localhost ~]# stratis pool list
+Name                         Total Physical   Properties                                   UUID
+my_pool_1      5 GiB / 37.63 MiB / 4.96 GiB      ~Ca,~Cr   9cc55a58-8142-46e6-a44b-413b70ae0d54
+my_pool_2   15 GiB / 591.65 MiB / 14.42 GiB      ~Ca,~Cr   06d677dd-145a-4fa8-91b2-930b531f8585
+[root@localhost ~]# stratis pool add-data my_pool_1 /dev/sdf 
+[root@localhost ~]# stratis pool list
+Name                         Total Physical   Properties                                   UUID
+my_pool_1     10 GiB / 41.63 MiB / 9.96 GiB      ~Ca,~Cr   9cc55a58-8142-46e6-a44b-413b70ae0d54
+my_pool_2   15 GiB / 591.65 MiB / 14.42 GiB      ~Ca,~Cr   06d677dd-145a-4fa8-91b2-930b531f8585
+[root@localhost ~]# 
+
+******************************************************************************************************************************
+
+
+FS snapshot
+==================================================================================
+1. Storing some data on my_pool_2
+
+[root@localhost ~]# cd /block/
+[root@localhost block]# cal > cal.txt ; mkdir aa bb cc dd ; echo "Linux classes" > linux.txt
+
+[root@localhost block]# ls
+aa  bb  cal.txt  cc  dd  linux.txt
+
+[root@localhost block]# du -sch .
+8.0K	.
+8.0K	total
+ 
+[root@localhost block]# df -hTP /block/
+Filesystem                                                                                      Type  Size  Used Avail Use% Mounted on
+/dev/mapper/stratis-1-06d677dd145a4fa891b2930b531f8585-thin-fs-df270e6c38c1445b8186ccf22ad9ec0e xfs   1.0T  7.2G 1017G   1% /block
+[root@localhost block]# 
+
+***********************************************************************
+2. Creating stratis  snapshot fs
+
+syntax:-
+stratis fs snapshot [pool_name] [fs_name] [snapshot_name]
+
+[root@localhost block]# stratis fs snapshot  my_pool_2 filesystem-2  mysnapshot
+[root@localhost block]# stratis filesystem  list my_pool_2
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_2   mysnapshot     546 MiB   May 27 2024 22:00   /dev/stratis/my_pool_2/mysnapshot     073abf82-0a33-4522-ae5d-7f5481177427
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+[root@localhost block]# 
+
+*****************************************************************************************
+
+3. removing the data
+
+[root@localhost block]# ls
+aa  bb  cal.txt  cc  dd  linux.txt
+[root@localhost block]# rm -rf *
+[root@localhost block]# cd
+[root@localhost ~]# 
+
+************************************************************************************************
+
+4. Restore the data from snapshot & Before creating another backup snapshot for safety
+
+
+[root@localhost ~]# umount /block 
+[root@localhost ~]# stratis filesystem snapshot  my_pool_2  mysnapshot block
+[root@localhost ~]# stratis filesystem list my_pool_2
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_2   mysnapshot     546 MiB   May 27 2024 22:00   /dev/stratis/my_pool_2/mysnapshot     073abf82-0a33-4522-ae5d-7f5481177427
+my_pool_2   block          546 MiB   May 27 2024 22:05   /dev/stratis/my_pool_2/block          35d46e89-abeb-4015-9d60-e9f68191525b
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+[root@localhost ~]# 
+
+
+
+*************************************************************************************
+
+5. Mounting the snapshot pool from backup
+
+
+[root@localhost ~]# mount /dev/stratis/my_pool_2/mysnapshot /block/
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@localhost ~]# df -hTP /block
+Filesystem                                                                                      Type  Size  Used Avail Use% Mounted on
+/dev/mapper/stratis-1-06d677dd145a4fa891b2930b531f8585-thin-fs-073abf820a334522ae5d7f5481177427 xfs   1.0T  7.2G 1017G   1% /block
+[root@localhost ~]# cd /block/
+[root@localhost block]# ls
+aa  bb  cal.txt  cc  dd  linux.txt
+[root@localhost block]# 
+
+**********************************************************************************************************
+6. Removing snapshot & Destroying stratis FS
+
+
+[root@localhost block]# rm /dev/stratis/my_pool_2/mysnapshot 
+rm: remove symbolic link '/dev/stratis/my_pool_2/mysnapshot'? y
+
+
+[root@localhost block]# rm /dev/stratis/my_pool_2/mysnapshot 
+rm: remove symbolic link '/dev/stratis/my_pool_2/mysnapshot'? y
+[root@localhost block]# stratis filesystem list my_pool_2
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_2   block          546 MiB   May 27 2024 22:05   /dev/stratis/my_pool_2/block          35d46e89-abeb-4015-9d60-e9f68191525b
+my_pool_2   mysnapshot     546 MiB   May 27 2024 22:00   /dev/stratis/my_pool_2/mysnapshot     073abf82-0a33-4522-ae5d-7f5481177427
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+[root@localhost block]# cd
+[root@localhost ~]# umount /block 
+[root@localhost ~]# stratis filesystem destroy my_pool_2  mysnapshot 
+[root@localhost ~]# stratis filesystem list my_pool_2
+Pool Name   Name           Used      Created             Device                                UUID                                
+my_pool_2   filesystem-2   546 MiB   May 27 2024 21:51   /dev/stratis/my_pool_2/filesystem-2   df270e6c-38c1-445b-8186-ccf22ad9ec0e
+my_pool_2   block          546 MiB   May 27 2024 22:05   /dev/stratis/my_pool_2/block          35d46e89-abeb-4015-9d60-e9f68191525b
+[root@localhost ~]# 
+
+
+[root@localhost ~]# stratis filesystem destroy my_pool_2  filesystem-2 
+[root@localhost ~]# stratis filesystem destroy my_pool_2  block 
+[root@localhost ~]# 
+[root@localhost ~]# stratis filesystem list my_pool_2
+Pool Name   Name   Used   Created   Device   UUID
+[root@localhost ~]#
+
+*****************************************************************************************************************************
+
+7.stratis pool delete
+
+
+[root@localhost ~]# stratis pool  list
+Name                        Total Physical   Properties                                   UUID
+my_pool_1    10 GiB / 41.63 MiB / 9.96 GiB      ~Ca,~Cr   9cc55a58-8142-46e6-a44b-413b70ae0d54
+my_pool_2   15 GiB / 45.63 MiB / 14.96 GiB      ~Ca,~Cr   06d677dd-145a-4fa8-91b2-930b531f8585
+[root@localhost ~]# stratis pool destroy my_pool_1
+[root@localhost ~]# stratis pool  list
+Name                        Total Physical   Properties                                   UUID
+my_pool_2   15 GiB / 45.63 MiB / 14.96 GiB      ~Ca,~Cr   06d677dd-145a-4fa8-91b2-930b531f8585
+[root@localhost ~]# stratis pool destroy my_pool_2
+[root@localhost ~]# stratis pool  list
+Name   Total Physical   Properties   UUID
+[root@localhost ~]# 
+
+**********************************************************************************************************************************
+
+Performance :-
+
+Stratis >>>>> LVM
