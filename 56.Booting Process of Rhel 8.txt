@@ -1,0 +1,97 @@
+Booting Process of Rhel 8
+
+
+[ Uses:-
+ root user password reset
+ grub passwd  add /remove
+ Booting machine in rescue mode with rescue kernel 
+ initramfs corruption ]
+
+
+******************************************************************************************************************************************************************************************************************************************************
+
+Booting----> process of copy files of OS  from Hard disk to RAM
+
+OS files stored ---> /boot partition
+
+
+ [POST] -------------> [BIOS] -----------------> [MBR]   -------------------------------------------------------------------------> [GRUB2]
+ Power ON            basic I/O system             Selects Boot Device:                                                                Grand Unified Bootloader V2
+ Self Test         combination H/W + S/W          HDD,LAN,CD/DVD, USB,HBA card						             Kernel ---loads---> Memory/RAM
+[check attached					  {integrated chip in motherboard                                                    [ It will show Kernel selection new kernel + old kernel + rescue kernel] 
+components properly                                it acts as firmware                                                               1. GRUB2 loads it's config from /boot/grub2/grub.cfg file
+working or not]                                   it will save settings in CMIOS battery setting                                     2.  option to select  the kernel to bootup machine inform of boot menu
+                                                  Now system is using UEFI bootloader--> Advanced]                                   3. Then it select/default VMLinuz kernel image from  /boot/vmlinuz-4.18..
+                                                 MBR--> Master Boot Record ---> it will store in first sector [512 bytes size]       4. Then extract contents of initramfs image from /boot/initramfs-4.18....img
+                                                                                                                                                       |
+																		       |
+                                                                                                                                                       |
+                                                                                                                                                       |
+                                                                                                                                          H/W initialization requires more Drivers and Modules 
+                                                                                                                                         GRUB2 selected Kernel and loaded on Memory/RAM
+                                                                                                                                                       |
+																		       |
+                                                                                                                                                       |
+                                                                                                                                                       |
+																		       V
+                			               [/sbin/init Execution]<----------------------------- [H/W Initialization]<----------------[ Kernel ]
+                                                    1. Kernel execute  /sbin/init from Initramfs---> 1st process having PID1                        *. Kernel(vmlinuz) find drivers in initramfs for all H/W initialization [/boot]
+						    2. In Rhel8,  init replaced with system & /sbin/init is a soft link to systemd              {  Now Kernel try to mount root fs and try to start systemd processes it requires modules for this processes }
+                                                    ls -l /sbin/init
+                                                    lrwxrwxrwx. 1 root root 22 Dec 2 07:02 /sbin/init -> ../lib/systemd/system                                                                                    
+                                                                |
+                                                                |
+                                                                |
+                                                                |                                                                                                                                                     
+								V
+						     [Initrd.target Execution]
+						1. with help of initramfs systemd executes all units for the initrd.target
+						2. ON Rhel 8, runlevels are called targets. There are total target(run levels) present in Linux
+						3. This includes the mounting the root fs on the disk at /sysroot directory         
+                                                                |
+                                                                |
+                                                                |
+                                                                V
+                                                      [Switches Root FS ]
+ 						1. kernel root FS switched from initramfs root(/sysroot) to system root file system root file system(/)
+                                                                |
+                                                                |
+                                                                |
+                                                                V
+                                                      [Systemd looks for default.target ]
+                                              1. Systemd reads the file linked by /etc/systemd/system/default.target to determine the default system target (run level).
+                                              [root@localhost boot]# ls -l /etc/systemd/system/default.target 
+                                              lrwxrwxrwx. 1 root root 36 Apr  9 17:52 /etc/systemd/system/default.target -> /lib/systemd/system/graphical.target
+
+                                    
+                                              2. There are total 7 targets(run levels) available in RHEL 8 also which can be used to boot up the machine in different modes as per the requirement
+							lwxrwxrwx. 1 root root   15 Aug 22  2023 runlevel0.target -> poweroff.target
+							lrwxrwxrwx. 1 root root   13 Aug 22  2023 runlevel1.target -> rescue.target
+							lrwxrwxrwx. 1 root root   17 Aug 22  2023 runlevel2.target -> multi-user.target
+                                                        lrwxrwxrwx. 1 root root   17 Aug 22  2023 runlevel3.target -> multi-user.target
+                                                        lrwxrwxrwx. 1 root root   17 Aug 22  2023 runlevel4.target -> multi-user.target
+                                                        lrwxrwxrwx. 1 root root   16 Aug 22  2023 runlevel5.target -> graphical.target
+                                                        lrwxrwxrwx. 1 root root   13 Aug 22  2023 runlevel6.target -> reboot.target
+
+                                              3. We can set desired target(run level) in the system as default target to boot up the machine by using this command.
+                                                 [root@localhost boot]# systemctl set-default graphical.target 
+                                                                |
+                                                                |
+                                                                |
+                                                                V
+                                                      [Start Other Services
+                                                           &
+                                                       OS Components]
+                                                     
+                                                 The system target file defines the services that system starts
+
+**********************************************************************************************************************************************************************************************************************************************************
+
+
+
+
+
+   
+
+
+                                                                         
